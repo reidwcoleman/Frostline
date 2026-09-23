@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Frostline</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1016; }
+      #app { position: fixed; inset: 0; }
+      #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      #ui { position: absolute; inset: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+      <div id="ui"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
