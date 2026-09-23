@@ -1,0 +1,16 @@
+// macOS universal (arm64 + x64) depot — content from `npm run dist:mac` (release/mac-universal/Frostline.app).
+// Launch option: Executable "Frostline.app", OS macOS.
+// Upload from a Mac (or Linux) with steamcmd so the Electron framework symlinks are preserved.
+"DepotBuildConfig"
+{
+	"DepotID"	"1000002"
+	"ContentRoot"	"../../release/mac-universal/"
+	"FileMapping"
+	{
+		"LocalPath"	"Frostline.app/*"
+		"DepotPath"	"Frostline.app/"
+		"recursive"	"1"
+	}
+	"FileExclusion"	"steam_appid.txt"
+	"FileExclusion"	".DS_Store"
+}

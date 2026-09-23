@@ -1,0 +1,16 @@
+// Linux x64 depot (native; Steam Deck can also run the Windows depot through Proton) —
+// content from `npm run dist:linux` (release/linux-unpacked).
+// Launch option: Executable "frostline", Arguments "--no-sandbox", OS Linux + SteamOS
+// (the Steam Linux Runtime container can't use Chromium's setuid sandbox; see docs/STEAM.md).
+"DepotBuildConfig"
+{
+	"DepotID"	"1000003"
+	"ContentRoot"	"../../release/linux-unpacked/"
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"recursive"	"1"
+	}
+	"FileExclusion"	"steam_appid.txt"
+}

@@ -1,0 +1,21 @@
+// SteamPipe app build for Frostline. Edit the IDs, then run `npm run steam:upload`.
+//   AppID  : your App ID from the Steamworks partner site (NOT 480 / Spacewar).
+//   Depots : one per OS; IDs are usually AppID+1, +2, +3 (create them under SteamPipe → Depots).
+// Paths are relative to this file. `npm run steam:upload` writes a resolved copy to release/steam/ and
+// skips depots whose build output doesn't exist yet, so you can ship one OS at a time.
+"AppBuild"
+{
+	"AppID"		"1000000"
+	"Desc"		"Frostline"			// overwritten by upload.mjs with "v<version> <date>"
+	"ContentRoot"	"../../release/"
+	"BuildOutput"	"../../release/steam/output/"
+	"SetLive"	""				// e.g. "beta" — never auto-publish to default; do that on the partner site
+	"Preview"	"0"				// 1 = dry run on Valve's side (no upload), good for checking mappings
+
+	"Depots"
+	{
+		"1000001"	"depot_build_windows.vdf"
+		"1000002"	"depot_build_macos.vdf"
+		"1000003"	"depot_build_linux.vdf"
+	}
+}

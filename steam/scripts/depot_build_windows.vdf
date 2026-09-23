@@ -1,0 +1,15 @@
+// Windows x64 depot — content from `npm run dist:win` (release/win-unpacked).
+// Launch option: Executable "Frostline.exe", OS Windows, 64-bit.
+"DepotBuildConfig"
+{
+	"DepotID"	"1000001"
+	"ContentRoot"	"../../release/win-unpacked/"
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"recursive"	"1"
+	}
+	"FileExclusion"	"*.pdb"
+	"FileExclusion"	"steam_appid.txt"		// dev-only; Steam sets the App ID when it launches the game
+}

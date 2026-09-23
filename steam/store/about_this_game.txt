@@ -1,0 +1,39 @@
+[h2]Ski. Hunt. Build. Outlast the cold.[/h2]
+
+You wake at the edge of a frozen lake, ringed by mountains. You have skis, a hatchet, and whatever daylight is left. [b]Frostline[/b] is a first-person alpine survival game about the joy of speed and the weight of the cold: fly down a mountain in the afternoon sun, then race the dusk home to a fire you built with your own hands.
+
+[h2]The mountain is the star[/h2]
+[list]
+[*][b]A whole range to explore.[/b] Four kilometres of sculpted peaks, couloirs, frozen lakes, creek beds and spruce forest, generated and eroded like the real thing.
+[*][b]Light that changes everything.[/b] Warm sun and cool blue shadows, amber golden hours, moonlit nights and the aurora on clear skies.
+[*][b]Weather that closes in.[/b] Snow drifts in, the wind picks up, and a blizzard can swallow the far ridge in minutes.
+[/list]
+
+[h2]Skiing that feels incredible[/h2]
+[list]
+[*][b]Carve, tuck and fly.[/b] Physical, readable skiing: lean into turns, tuck for speed, launch off ridgelines and land it (or don't).
+[*][b]Every run leaves a mark.[/b] Your tracks stay carved into the snow behind you.
+[*][b]The fastest way home[/b] is straight down. Top 100 km/h if you dare.
+[/list]
+
+[h2]Survival that is simple but tense[/h2]
+[list]
+[*][b]Cold, hunger, night, wolves.[/b] Four clear threats, no busywork. Warmth is the resource that matters.
+[*][b]Fire is relief.[/b] Chop wood, gather stone, and light a campfire to cook, warm up and push back the dark.
+[*][b]Hunt with spear and bow.[/b] Track deer through the trees, and learn what to do when the pack starts hunting you.
+[/list]
+
+[h2]Build a place to come home to[/h2]
+[list]
+[*][b]Fell real trees.[/b] Every tree in the forest can come down, and becomes the logs you build with.
+[*][b]From bedroll to log cabin.[/b] Start with a lean-to, then raise foundations, walls, a roof and a door the wolves can't open.
+[*][b]A bedroll is a second chance.[/b] Sleep through the night, and wake there if the mountain takes you.
+[/list]
+
+[h2]Built for Steam[/h2]
+[list]
+[*]16 Steam Achievements and lifetime stats
+[*]Steam Cloud saves across Windows, macOS and Linux
+[*]Full controller support; tuned presets for Steam Deck
+[*]Autosave at dawn, after sleeping and every two minutes
+[/list]

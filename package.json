@@ -3,31 +3,186 @@
   "productName": "Frostline",
   "version": "0.1.0",
   "description": "Frostline — an alpine survival game. Ski, hunt, build, survive.",
+  "author": "Reid Coleman",
+  "license": "UNLICENSED",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
+  "frostline": {
+    "steamAppId": 480
+  },
   "scripts": {
     "dev": "vite --port 5317 --strictPort --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "build:web": "vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --port 5198",
-    "shot": "node tools/shot.mjs"
+    "shot": "node tools/shot.mjs",
+    "electron:dev": "node electron/dev.mjs",
+    "electron:start": "npm run build && electron .",
+    "start": "electron .",
+    "icons": "node build/scripts/make-icons.mjs",
+    "smoke": "node electron/smoke.mjs",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --mac --win --linux",
+    "steam:upload": "node steam/scripts/upload.mjs",
+    "steam:icons": "node steam/scripts/achievement-icons.mjs"
   },
   "dependencies": {
-    "@fontsource/barlow-semi-condensed": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
-    "n8ao": "^2.0.1",
-    "postprocessing": "^6.39.5",
-    "steamworks.js": "^0.4.0",
-    "three": "^0.186.0"
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@types/node": "^26.6.2",
     "@types/three": "^0.186.0",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
+    "n8ao": "^2.0.1",
     "playwright-core": "^1.63.0",
+    "postprocessing": "^6.39.5",
+    "three": "^0.186.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"
+  },
+  "build": {
+    "appId": "com.reidcoleman.frostline",
+    "productName": "Frostline",
+    "copyright": "Copyright © 2026 Reid Coleman",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "!electron/dev.mjs",
+      "!electron/smoke.mjs",
+      "package.json",
+      "!node_modules/@types/**",
+      "!node_modules/undici-types/**",
+      "!node_modules/steamworks.js/*.d.ts",
+      "!node_modules/steamworks.js/README.md"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/steamworks.js/dist/**"
+    ],
+    "compression": "normal",
+    "npmRebuild": false,
+    "electronLanguages": [
+      "en-US",
+      "en"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": false,
+      "enableCookieEncryption": false,
+      "resetAdHocDarwinSignature": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "icon": "build/icon.icns",
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/steamworks.js/dist/osx/*",
+      "files": [
+        "dist/**/*",
+        "!node_modules/steamworks.js/dist/win64/**",
+        "!node_modules/steamworks.js/dist/linux64/**"
+      ],
+      "extendInfo": {
+        "LSApplicationCategoryType": "public.app-category.games",
+        "GCSupportsControllerUserInteraction": true,
+        "NSHighResolutionCapable": true
+      }
+    },
+    "dmg": {
+      "title": "Frostline ${version}",
+      "artifactName": "Frostline-${version}-mac.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "files": [
+        "dist/**/*",
+        "!node_modules/steamworks.js/dist/osx/**",
+        "!node_modules/steamworks.js/dist/linux64/**",
+        "!node_modules/steamworks.js/dist/win64/*.lib"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Frostline",
+      "artifactName": "Frostline-${version}-setup.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Game",
+      "executableName": "frostline",
+      "synopsis": "Ski. Hunt. Build. Outlast the cold.",
+      "files": [
+        "dist/**/*",
+        "!node_modules/steamworks.js/dist/osx/**",
+        "!node_modules/steamworks.js/dist/win64/**"
+      ]
+    },
+    "appImage": {
+      "artifactName": "Frostline-${version}-linux-x64.${ext}"
+    }
   }
 }

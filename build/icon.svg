@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="ssky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0F15"/>
+      <stop offset="0.55" stop-color="#0E1419"/>
+      <stop offset="1" stop-color="#1A2433"/>
+    </linearGradient>
+    <radialGradient id="sglow" cx="742" cy="318" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF6A2B" stop-opacity="0.38"/>
+      <stop offset="0.35" stop-color="#FF6A2B" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FF6A2B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ssunface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#F4F1EA"/>
+      <stop offset="1" stop-color="#E6DDD0"/>
+    </linearGradient>
+    <linearGradient id="sshade" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9DB4D9"/>
+      <stop offset="1" stop-color="#7D95BE"/>
+    </linearGradient>
+    <linearGradient id="ssun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF8A55"/>
+      <stop offset="1" stop-color="#FF6A2B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#ssky)"/>
+  <rect width="1024" height="1024" fill="url(#sglow)"/>
+  <!-- a few stars, low-key -->
+  <g fill="#DCE6F5" opacity="0.55">
+    <circle cx="170" cy="170" r="5"/><circle cx="292" cy="96" r="3.5"/><circle cx="96" cy="330" r="3"/>
+    <circle cx="560" cy="120" r="3.5"/><circle cx="905" cy="140" r="4.5"/>
+  </g>
+  <!-- signal flare / low sun: the one accent -->
+  <circle cx="742" cy="318" r="92" fill="url(#ssun)"/>
+  <!-- far ridge -->
+  <path d="M-10 700 L150 590 L250 640 L360 560 L470 660 L620 590 L760 650 L900 575 L1034 640 L1034 1034 L-10 1034 Z" fill="#223047"/>
+  <!-- the peak: sun face -->
+  <path d="M-20 900 L150 640 L280 500 L352 430 L448 222 L520 330 L588 372 L676 470 L790 560 L905 618 L1044 690 L1044 1044 L-20 1044 Z" fill="url(#ssunface)"/>
+  <!-- the peak: shadow face (left of the ridge line) -->
+  <path d="M-20 900 L150 640 L280 500 L352 430 L448 222 L470 330 L440 430 L476 540 L420 660 L452 780 L380 1044 L-20 1044 Z" fill="url(#sshade)"/>
+  <!-- a sliver of exposed rock under the summit (steep faces are rock in-game) -->
+  <path d="M448 222 L470 330 L458 356 L446 300 Z" fill="#4A4A52" opacity="0.75"/>
+  <!-- carved twin ski track down the sun face -->
+  <g fill="none" stroke="#33445C" stroke-width="11" stroke-linecap="round" opacity="0.9">
+    <path d="M486 330 C 560 392, 600 450, 540 520 S 470 640, 590 720 S 700 860, 600 1044"/>
+    <path d="M504 326 C 580 388, 622 452, 562 522 S 492 642, 612 722 S 722 862, 622 1044"/>
+  </g>
+</svg>

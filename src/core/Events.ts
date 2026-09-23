@@ -37,6 +37,8 @@ export interface GameEvents {
   'structure:removed': { piece: BuildPieceId; id: number };
   'fire:lit': { id: number };
   'fire:out': { id: number };
+  /** The player stood inside a fully enclosed, roofed shelter for the first time (HOMESTEAD). */
+  'shelter:complete': {};
 
   'animal:killed': { species: Species; by: ItemId | null; id: number };
   'animal:harvested': { species: Species; id: number };
