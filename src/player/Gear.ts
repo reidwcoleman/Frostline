@@ -13,8 +13,8 @@ export const SKI_BASE_Y = 0.02;
 export const SKI_THICK = 0.017;
 
 export const PALETTE = {
-  jacket: 0x1d2a44, // dark navy
-  jacketShade: 0x172238,
+  jacket: 0x8c2a1e, // expedition red
+  jacketShade: 0x5e1d16,
   pants: 0x1a2130,
   mitten: 0x2b2729,
   cuff: 0x464c57,

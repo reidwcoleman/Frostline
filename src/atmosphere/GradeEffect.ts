@@ -90,6 +90,13 @@ void mainImage( const in vec4 inputColor, const in vec2 uv, out vec4 outputColor
     }
   }
 
+  // Lens: faint lateral chromatic aberration toward the frame edges (real glass does this).
+  {
+    vec2 ab = c * dot( ca, ca ) * 0.0016;
+    hdr.r = mix( hdr.r, texture2D( inputBuffer, uv - ab ).r, 0.85 );
+    hdr.b = mix( hdr.b, texture2D( inputBuffer, uv + ab ).b, 0.85 );
+  }
+
   vec3 col = flEncode( flAgx( hdr * uExposure ) );
 
   // Split toning: cool lifted shadows, warm highlights.
@@ -115,6 +122,9 @@ void mainImage( const in vec4 inputColor, const in vec2 uv, out vec4 outputColor
 
   float v = dot( ca, ca );
   col *= 1.0 - uNightP.z * v * 1.25;
+  // Film grain: fine, luminance-weighted (strongest in the mid-tones, never in clipped snow).
+  float gn = fract( sin( dot( floor( uv * resolution ) + fract( time * 7.13 ) * 97.0, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+  col += ( gn - 0.5 ) * 0.022 * ( 1.0 - abs( L * 2.0 - 1.0 ) * 0.7 );
 
   if ( uDamage > 0.001 ) {
     float dv = smoothstep( 0.05, 0.6, v );

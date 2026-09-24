@@ -138,12 +138,15 @@ void terrainSurface() {
   float mixB = smoothstep(0.35, 0.65, nD.g);
   float exposure = clamp(0.5 + 0.9 * max(-cav, 0.0) - forest * 0.7 + (nA.r - 0.5) * 0.8, 0.12, 1.0);
   float microFade = 1.0 - smoothstep(30.0, 140.0, dist);
-  vec2 mg = (g1 * (0.9 - 0.5 * mixB) + g2 * (0.6 + 1.2 * mixB)) * exposure * microFade;
+  vec2 mg = (g1 * (0.9 - 0.5 * mixB) + g2 * (0.6 + 1.2 * mixB)) * exposure * microFade * 1.6;
 
   vec3 snowAlb = vec3(0.86, 0.875, 0.9);
-  snowAlb *= 0.95 + 0.05 * nB.r + 0.03 * (s1.z - 0.5) * microFade;
+  snowAlb *= 0.95 + 0.05 * nB.r + 0.05 * (s1.z - 0.5) * microFade;
+  // Wind-packed slab vs fresh powder: broad, faint brightness/roughness patches.
+  float slab = smoothstep(0.55, 0.75, nB.a * 0.7 + nA.b * 0.5) * (1.0 - forest);
+  snowAlb *= 1.0 - slab * 0.035;
   snowAlb *= mix(vec3(1.0), vec3(0.94, 0.965, 1.0), clamp(cav, 0.0, 1.0));
-  float snowRough = 0.8 + 0.12 * nC.a - 0.28 * s1.w * exposure * microFade;
+  float snowRough = 0.8 + 0.12 * nC.a - 0.28 * s1.w * exposure * microFade - slab * 0.18;
 
   // Forest floor: needle litter and shaded tree wells under the canopy.
   float litter = forest * smoothstep(0.45, 0.75, nC.r * 0.7 + nB.g * 0.5);
@@ -220,10 +223,13 @@ void terrainSurface() {
   float steep = 1.0 - Nm.y;
   float ribs = clamp(-cav, -1.0, 1.0);
   float gully = smoothstep(0.5, 0.8, flow);
-  float rockNoise = (nB.b - 0.5) * 0.12 + (nA.g - 0.5) * 0.12;
+  float rockNoise = (nA.g - 0.5) * 0.16 + (nB.r - 0.5) * 0.09; // smooth channels only (.b is cellular: leopard spots)
   // Snow holds on most slopes (as in real winter alps); rock shows on the steepest faces and
   // wind-stripped ribs, with gullies filled in.
-  float rockMask = smoothstep(0.4, 0.54, steep + rockNoise * 1.3 + ribs * 0.28 - gully * 0.14) * (1.0 - lake);
+  // Curvature is noisy at heightmap-texel scale: lean on it less with distance so faces don't
+  // break into speckles, and keep the transition soft enough to read as drifted-in snow.
+  float ribW = mix(0.26, 0.12, smoothstep(150.0, 700.0, dist));
+  float rockMask = smoothstep(0.39, 0.57, steep + rockNoise * 1.3 + ribs * ribW - gully * 0.14) * (1.0 - lake);
   vec3 rockAlb = vec3(0.07);
   vec3 Nr = Nm;
   float rockSnow = 0.0;
@@ -269,7 +275,10 @@ void terrainSurface() {
     rockAlb = mix(rockAlb, vec3(0.16, 0.15, 0.1), lichen * 0.3);
     rockAO = 0.55 + 0.45 * h;
     // Snow caught on strata ledges and on the flattest facets; never on overhang-steep rock.
-    float flatFacet = smoothstep(0.82, 0.93, Nr.y + (nC.g - 0.5) * 0.12);
+    // Judge ledges on a normal whose fine bump detail fades with distance, or far faces turn to
+    // salt-and-pepper speckle (per-pixel snow/rock flips).
+    vec3 Nf = normalize(mix(Nm, Nr, 0.25 + 0.75 * nearF));
+    float flatFacet = smoothstep(0.8, 0.95, Nf.y + (nC.g - 0.5) * 0.12 * nearF + (nB.g - 0.5) * 0.08);
     rockSnow = max(ledge * (0.55 + 0.45 * nC.g), flatFacet) * (1.0 - smoothstep(0.42, 0.62, steep));
     // Thin rock at the patch margins gets a dusting instead of a hard edge.
     rockSnow = max(rockSnow, (1.0 - smoothstep(0.35, 0.8, rockMask)) * 0.6);

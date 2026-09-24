@@ -137,6 +137,8 @@ export class Weapons implements System {
   private bow!: BowRig;
   private torch!: TorchModel;
   private flame!: TorchFlame;
+  /** Third-person copy of the torch (the flame moves into it in third person). */
+  private tpTorch: TorchModel | null = null;
   private arrowProto!: THREE.Group;
   private spearProto!: THREE.Group;
   /** Per-weapon holder (child of a hand anchor): rest pose + in-fist rotation. */
@@ -243,6 +245,16 @@ export class Weapons implements System {
       });
     }
 
+    // Third-person copies, held in the avatar's fists (Body shows/hides and poses them).
+    const pc = ctx.sys.player as unknown as { registerHeld?: (id: string, o: THREE.Object3D) => void };
+    if (pc?.registerHeld) {
+      this.tpTorch = buildTorch(this.M);
+      pc.registerHeld('hatchet', buildHatchet(this.M));
+      pc.registerHeld('spear', buildSpear(this.M));
+      pc.registerHeld('bow', buildBow(this.M).root);
+      pc.registerHeld('torch', this.tpTorch.root);
+    }
+
     ctx.events.on('equip:changed', () => {
       // A new selection cancels whatever the old weapon was doing.
       this.cancelActions();
@@ -271,6 +283,12 @@ export class Weapons implements System {
     this.charging = false;
     this.charge = 0;
     this.hitStop = 0;
+  }
+
+  /** What the third-person body needs to pose the arms. */
+  tpState() {
+    const a = this.act;
+    return { shown: this.shown, act: a ? a.kind : null, phase: a ? a.t / a.dur : 0, aim: this.aimK, draw: this.draw, hidden: this.thrownHide };
   }
 
   // ------------------------------------------------------------------ models for projectiles
@@ -739,7 +757,11 @@ export class Weapons implements System {
     const visible = this.shown === 'torch';
     if (!visible) return;
     const t = ctx.time;
-    this.torch.flameAnchor.getWorldPosition(this.torchPosition);
+    // The flame lives on whichever torch you can see.
+    const tp = !!(ctx.sys.player as unknown as { thirdPerson?: boolean }).thirdPerson && this.tpTorch;
+    const anchor = tp ? this.tpTorch!.flameAnchor : this.torch.flameAnchor;
+    if (this.flame.group.parent !== anchor) anchor.add(this.flame.group);
+    anchor.getWorldPosition(this.torchPosition);
     this.torchOn = damp(this.torchOn, this.torchLit ? 1 : 0, 6, dt);
     const fx = this.effects;
     this.flame.group.visible = this.torchOn > 0.05;
@@ -755,6 +777,7 @@ export class Weapons implements System {
         this.torchLight.intensity = 7 * this.flame.flicker * this.torchOn;
       }
       this.torch.emberMat.emissiveIntensity = (1.2 + 1.4 * (this.flame.flicker - 0.82)) * this.torchOn;
+      if (this.tpTorch) this.tpTorch.emberMat.emissiveIntensity = this.torch.emberMat.emissiveIntensity;
       this.torchLoop?.setPosition(this.torchPosition);
       // Burn down (in-game hours); snow and wind eat fuel faster.
       if (ctx.game.state === 'playing' && !ctx.clock.frozen) {

@@ -208,9 +208,14 @@ vec4 cirrusLayer( vec3 d, vec3 camPos ) {
   float ca = cos( uCirrus.z ), sa = sin( uCirrus.z );
   vec2 r = vec2( ca * xz.x + sa * xz.y, - sa * xz.x + ca * xz.y );
   vec2 uv = r * vec2( 1.0 / 26000.0, 1.0 / 7000.0 );
-  float n = texture2D( uNoise, uv ).g * 0.65 + texture2D( uNoise, uv * vec2( 3.0, 7.0 ) + 0.3 ).a * 0.35;
-  float streak = texture2D( uNoise, uv * vec2( 0.6, 11.0 ) + vec2( 0.5, 0.1 ) ).r;
-  float dens = smoothstep( 1.0 - uCirrus.x, 1.0 - uCirrus.x + 0.35, n ) * ( 0.45 + 0.55 * streak );
+  // Domain warp bends the fibres so they curl like real cirrus (uncinus hooks) instead of ruling
+  // straight brush lines across the sky.
+  vec2 wv = texture2D( uNoise, uv * 0.45 + vec2( 0.21, 0.77 ) ).rg - 0.5;
+  uv += wv * vec2( 0.35, 0.9 );
+  float n = texture2D( uNoise, uv ).g * 0.6 + texture2D( uNoise, uv * vec2( 2.3, 3.1 ) + 0.3 ).a * 0.4;
+  float streak = texture2D( uNoise, uv * vec2( 0.9, 4.2 ) + vec2( 0.5, 0.1 ) ).r;
+  float fine = texture2D( uNoise, uv * vec2( 2.0, 9.0 ) + vec2( 0.13, 0.42 ) ).b;
+  float dens = smoothstep( 1.0 - uCirrus.x, 1.0 - uCirrus.x + 0.5, n ) * ( 0.55 + 0.3 * streak + 0.15 * fine ) * 0.8;
   dens *= uCirrus.w * smoothstep( -0.02, 0.06, d.y );
   float far = smoothstep( 40000.0, 160000.0, t );
   dens *= 1.0 - far * 0.6;

@@ -134,6 +134,6 @@ export const CAM = {
   dipDamping: 11,
   maxShakeRot: 2.6 * DEG,
   maxShakePos: 0.045,
-  tpDistance: 4.2, // third-person chase distance (m)
-  tpHeight: 1.15, // extra height above the eye the chase cam sits at (m)
+  tpDistance: 3.3, // third-person chase distance (m)
+  tpHeight: 0.8, // extra height above the eye the chase cam sits at (m)
 } as const;

@@ -11,7 +11,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { buildArm, buildPole, buildSkiAssembly, buildSkiGeometry, makeMaterials, PALETTE, type GearMaterials, type SkiAssembly } from './Gear';
 import type { Locomotion } from './Locomotion';
 import { SKI } from './tuning';
-import { buildAvatar, type AvatarArm, type TpPart } from './Avatar';
+import { buildAvatar, snowCover, type AvatarArm, type TpPart } from './Avatar';
+import { ITEMS } from '../core/Items';
+import { buildProp, HELD_XFORM } from './props';
 
 const _m = new THREE.Matrix4();
 const _x = new THREE.Vector3();
@@ -29,6 +31,26 @@ const _seg = new THREE.Vector3();
 const HAND_R = new THREE.Vector3(0.28, -0.3, -0.5);
 const HAND_L = new THREE.Vector3(-0.28, -0.3, -0.5);
 
+type ReachKind = 'take' | 'stow' | 'eat' | 'heal';
+interface Reach {
+  kind: ReachKind;
+  t: number;
+  dur: number;
+  side: -1 | 1;
+  from: string | null; // in hand at the start (goes into the pack)
+  to: string | null; // comes out of the pack
+}
+interface ArmPose {
+  sh: number;
+  el: number;
+  spread: number;
+  wrist: number;
+}
+const ease = (x: number) => {
+  const t = clamp(x, 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
 interface PlantAnim {
   t: number; // seconds since plant (-1 idle)
 }
@@ -42,9 +64,18 @@ export class Body {
   private legs: { thigh: THREE.Mesh; shin: THREE.Mesh; knee: THREE.Mesh }[] = [];
   private shadowProxy: THREE.Group;
   private mats: GearMaterials;
-  private pack!: THREE.Mesh[];
-  private packBuckle!: THREE.Mesh;
-  private packAccent!: THREE.MeshStandardMaterial;
+  private pelvis!: THREE.Mesh;
+  private packLid!: THREE.Group;
+  private lidOpen = 0;
+  private gaiters: THREE.Mesh[] = [];
+  private gaiterMat!: THREE.Material;
+  /** Held things: weapon models registered by combat, plus simple props built on demand. */
+  private held = new Map<string, THREE.Object3D>();
+  private heldShown: [string | null, string | null] = [null, null]; // [left, right]
+  private reach: Reach | null = null;
+  private quietT = 2;
+  private fpProp = new THREE.Group();
+  private fpShown: string | null = null;
   private torsoMesh!: THREE.Mesh;
   private headMesh!: THREE.Mesh;
   private tpParts: TpPart[] = [];
@@ -126,40 +157,25 @@ export class Body {
     this.avArmL = av.armL;
     this.avArmR = av.armR;
 
-    // ---- backpack: rides on the torso (local -Z is the ski/look forward direction, so a
-    // positive Z offset sits it on the back). Only meaningful seen from outside -> third person.
-    this.packAccent = new THREE.MeshStandardMaterial({ color: PALETTE.accent, roughness: 0.6 });
-    const packBody = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.34, 0.16, 3, 0.035), m.shadowOnly);
-    packBody.name = 'packBody';
-    const packLid = new THREE.Mesh(new RoundedBoxGeometry(0.25, 0.1, 0.17, 3, 0.03), m.shadowOnly);
-    packLid.name = 'packLid';
-    packLid.position.y = 0.2;
-    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.26, 12), m.shadowOnly);
-    roll.name = 'packRoll';
-    roll.rotation.z = Math.PI / 2;
-    roll.position.y = -0.19;
-    const buckle = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.007, 6, 12), m.shadowOnly);
-    buckle.name = 'packBuckle';
-    this.packBuckle = buckle;
-    buckle.position.set(0, 0.05, -0.09);
-    const strapGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.4, 6);
-    const strapL = new THREE.Mesh(strapGeo, m.shadowOnly);
-    strapL.name = 'strapL';
-    strapL.position.set(-0.11, 0.12, -0.08);
-    strapL.rotation.x = -0.55;
-    const strapR = strapL.clone();
-    strapR.name = 'strapR';
-    strapR.position.x = 0.11;
-    this.pack = [packBody, packLid, roll, strapL, strapR];
-    const packGroup = new THREE.Group();
-    packGroup.name = 'pack';
-    packGroup.position.set(0, 0.08, 0.16);
-    for (const o of [...this.pack, buckle]) {
-      o.castShadow = true;
-      o.frustumCulled = false;
-      packGroup.add(o);
+    this.pelvis = av.pelvis;
+    this.shadowProxy.add(av.pelvis);
+    this.packLid = av.packLid;
+    this.gaiterMat = av.gaiterMat;
+    for (const leg of this.legs) {
+      const g = new THREE.Mesh(av.gaiterGeo, m.shadowOnly);
+      g.castShadow = true;
+      g.frustumCulled = false;
+      leg.shin.add(g);
+      this.gaiters.push(g);
     }
-    torso.add(packGroup);
+    this.fpProp.name = 'fpProp';
+    viewmodel.add(this.fpProp);
+    const ev = ctx.events;
+    ev.on('equip:changed', ({ item }) => this.onEquip(item));
+    ev.on('item:consumed', ({ item }) => this.startReach(ITEMS[item]?.kind === 'medical' ? 'heal' : 'eat', null, item));
+    ev.on('item:changed', ({ item, delta }) => {
+      if (delta > 0 && item !== 'log' && !ITEMS[item]?.equip) this.startReach('stow', item, null);
+    });
 
     // ---- camera space: arms, mittens, poles
     viewmodel.add(this.torso);
@@ -198,14 +214,15 @@ export class Body {
       shin.material = on ? this.pantsMat : m.shadowOnly;
       knee.material = on ? this.pantsMat : m.shadowOnly;
     }
-    for (const o of this.pack) o.material = on ? m.jacketShade : m.shadowOnly;
-    this.packBuckle.material = on ? this.packAccent : m.shadowOnly;
+    for (const g of this.gaiters) g.material = on ? this.gaiterMat : m.shadowOnly;
     this.tp = on;
     this.torso.visible = !on && this.armsVis > 0.02;
   }
 
   reset() {
     const p = this.ctx.player;
+    this.reach = null;
+    this.quietT = 2;
     this.skiVis = p.onSkis ? 1 : 0;
     this.plantL.t = this.plantR.t = -1;
     this.skiYaw = p.heading;
@@ -222,8 +239,18 @@ export class Body {
   }
 
   update(dt: number, loco: Locomotion, eye: number, hidden: boolean) {
-    const { player: p, inventory } = this.ctx;
+    const { player: p, inventory, env } = this.ctx;
     this.idleT += dt;
+    this.quietT = Math.max(0, this.quietT - dt);
+    if (this.reach) {
+      this.reach.t += dt;
+      const ws = this.weaponState();
+      if (this.reach.t >= this.reach.dur || (ws.act && this.reach.side === (HELD_XFORM[ws.shown ?? '']?.side ?? 1))) this.reach = null;
+    }
+    // Snow settles on the clothes while it falls, and melts off slowly otherwise.
+    const want = env.snowfall > 0.05 ? 0.35 + 0.55 * env.snowfall : 0;
+    snowCover.value = clamp(snowCover.value + (want - snowCover.value) * dt * (want > snowCover.value ? 1 / 60 : 1 / 240), 0, 1);
+    this.updateFpProp();
     const alive = p.mode !== 'crashed' && p.mode !== 'dead';
 
     // ---- skis clip on/off animation
@@ -362,8 +389,11 @@ export class Body {
     head.rotation.set(-p.pitch * 0.35, p.yaw, 0, 'YXZ');
     head.position.addScaledVector(_f, 0.02);
 
-    // Arms. Walking: swing opposite the legs, elbows softly bent. Skiing: athletic stance, hands
-    // forward at waist height, poles angled back, a jab forward on each pole plant. Tuck: fists in.
+    // Pelvis bridges the jacket hem and the thighs.
+    this.pelvis.position.set(0, hipH + 0.02, 0).addScaledVector(_x, leanShift).addScaledVector(_f, -back);
+    this.pelvis.rotation.set(0, this.skiYaw, 0);
+
+    // Arms: locomotion pose -> what the hand holds / is doing -> reaching into the pack on top.
     let swingTarget = 0;
     if (!onSkis) {
       const ph = (loco.stepIndex + loco.strideDist / Math.max(loco.strideLen, 0.1)) * Math.PI;
@@ -372,34 +402,291 @@ export class Body {
     this.armSwing = damp(this.armSwing, swingTarget, 8, dt);
     const tuck = loco.tuck;
     const plantK = (t: number) => (t >= 0 && t < 0.45 ? Math.sin(Math.PI * (t / 0.45)) : 0);
+    const ws = this.weaponState();
+    const r = this.reach;
+    let reachW = 0;
+    let inPack = 0;
     for (const [arm, side] of [[this.avArmL, -1], [this.avArmR, 1]] as const) {
-      let sh: number, el: number, spread: number, poleTilt: number;
+      const pose: ArmPose = { sh: 0, el: 0, spread: 0, wrist: 0 };
+      let poleTilt = 0;
+      let poleVis = false;
       if (onSkis) {
         const jab = plantK(side < 0 ? this.plantL.t : this.plantR.t) * 0.35;
-        sh = 0.45 + jab + tuck * 0.35;
-        el = 0.95 + tuck * 0.55;
-        spread = side * (0.2 - tuck * 0.12);
+        pose.sh = 0.45 + jab + tuck * 0.35;
+        pose.el = 0.95 + tuck * 0.55;
+        pose.spread = side * (0.2 - tuck * 0.12);
         // Keep the pole pointing down and back regardless of how far the arm reaches forward.
-        poleTilt = -(sh + el) - 0.32 + jab * 0.6 - tuck * 0.6;
-        arm.pole.visible = true;
+        poleTilt = -(pose.sh + pose.el) - 0.32 + jab * 0.6 - tuck * 0.6;
+        poleVis = true;
       } else {
-        sh = 0.1 + this.armSwing * -side;
-        el = 0.25 + Math.abs(this.armSwing) * 0.35;
-        spread = side * 0.08;
-        poleTilt = 0;
-        arm.pole.visible = false;
+        pose.sh = 0.1 + this.armSwing * -side;
+        pose.el = 0.25 + Math.abs(this.armSwing) * 0.35;
+        pose.spread = side * 0.08;
       }
-      arm.pivot.rotation.set(sh, 0, spread);
-      arm.elbow.rotation.set(el, 0, 0);
+      // Tool / weapon in this hand (or the draw hand of the bow).
+      const holding = this.holdPose(pose, side, ws);
+      if (holding) poleVis = false;
+      let steady: string | null = ws.shown && !ws.hidden && (HELD_XFORM[ws.shown]?.side ?? 1) === side ? ws.shown : null;
+      // Pack reach.
+      if (r && r.side === side) {
+        const k = r.t / r.dur;
+        const w = this.reachPose(pose, r, k, side);
+        reachW = w;
+        poleVis = false;
+        if (r.kind === 'take') steady = k < 0.42 ? r.from : r.to;
+        else if (r.kind === 'stow') steady = k < 0.47 ? r.from : null;
+        else steady = k > 0.3 && k < 0.85 ? r.to : null;
+        inPack = r.kind === 'stow' ? smoothstep(0.3, 0.45, k) * (1 - smoothstep(0.5, 0.62, k)) : smoothstep(0.2, 0.33, k) * (1 - smoothstep(0.42, 0.55, k));
+      }
+      arm.pivot.rotation.set(pose.sh, 0, pose.spread);
+      arm.elbow.rotation.set(pose.el, 0, 0);
+      arm.hand.rotation.set(pose.wrist, 0, 0);
       arm.pole.rotation.set(poleTilt, 0, 0);
+      arm.pole.visible = poleVis;
+      this.showHeld(side, this.tp ? steady : null);
     }
+    // Lid lifts while a hand is in the pack; head glances back over that shoulder.
+    this.lidOpen = damp(this.lidOpen, inPack > 0.01 ? 1 : 0, inPack > 0.01 ? 14 : 6, dt);
+    this.packLid.rotation.x = this.lidOpen * 1.5;
+    if (r) {
+      head.rotation.y += r.side * -0.55 * reachW * (r.kind === 'eat' || r.kind === 'heal' ? 0 : 1);
+      torso.rotation.y += r.side * 0.22 * reachW;
+    }
+  }
+
+  // ------------------------------------------------------------------ held items & the pack
+  /** Combat registers the third-person model of each tool; Body shows it in the right fist. */
+  registerHeld(id: string, obj: THREE.Object3D) {
+    const x = HELD_XFORM[id];
+    if (x) {
+      obj.position.set(...x.pos);
+      obj.rotation.set(...x.rot);
+    }
+    obj.visible = false;
+    obj.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) {
+        o.castShadow = true;
+        o.frustumCulled = false;
+      }
+    });
+    const side = x?.side ?? 1;
+    (side < 0 ? this.avArmL : this.avArmR).item.add(obj);
+    this.held.set(`${side}:${id}`, obj);
+  }
+
+  private heldObj(side: -1 | 1, id: string): THREE.Object3D {
+    const key = `${side}:${id}`;
+    let o = this.held.get(key);
+    if (!o) {
+      // Tools registered on the other hand, or pack items: build a prop for this fist.
+      o = buildProp(id);
+      o.visible = false;
+      (side < 0 ? this.avArmL : this.avArmR).item.add(o);
+      this.held.set(key, o);
+    }
+    return o;
+  }
+
+  private showHeld(side: -1 | 1, id: string | null) {
+    const i = side < 0 ? 0 : 1;
+    if (this.heldShown[i] === id) return;
+    if (this.heldShown[i]) this.heldObj(side, this.heldShown[i]!).visible = false;
+    this.heldShown[i] = id;
+    if (id) this.heldObj(side, id).visible = true;
+  }
+
+  private weaponState(): { shown: string | null; act: string | null; phase: number; aim: number; draw: number; hidden: boolean } {
+    const w = (this.ctx.sys as unknown as { weapons?: { tpState?: () => ReturnType<Body['weaponState']> } }).weapons;
+    return w?.tpState?.() ?? { shown: null, act: null, phase: 0, aim: 0, draw: 0, hidden: false };
+  }
+
+  /** Overrides `pose` for a hand holding a tool. Returns true if this hand is busy with it. */
+  private holdPose(pose: ArmPose, side: -1 | 1, ws: ReturnType<Body['weaponState']>): boolean {
+    const w = ws.shown;
+    if (!w) return false;
+    const bow = w === 'bow';
+    const toolSide = HELD_XFORM[w]?.side ?? 1;
+    if (bow && side > 0) {
+      // Draw hand: pulls the string back to the cheek.
+      const d = ws.draw;
+      if (d < 0.02) return false;
+      pose.sh = lerp(pose.sh, 1.45, smoothstep(0, 0.2, d));
+      pose.el = lerp(pose.el, 0.3 + d * 1.9, smoothstep(0, 0.2, d));
+      pose.spread = side * (0.1 + d * 0.45);
+      return true;
+    }
+    if (side !== toolSide) return false;
+    const walkSwing = this.armSwing * -side * 0.25;
+    if (w === 'hatchet' || w === 'torch') {
+      const torch = w === 'torch';
+      pose.sh = (torch ? 0.7 : 0.3) + walkSwing;
+      pose.el = torch ? 0.8 : 1.0;
+      pose.spread = side * (torch ? 0.22 : 0.12);
+      pose.wrist = 0;
+      if (ws.act === 'swing' || ws.act === 'tswing') {
+        const k = ws.phase;
+        // wind up over the shoulder, chop down through the target, recover
+        const up = ease(k / 0.3);
+        const down = ease((k - 0.3) / 0.15);
+        const back = ease((k - 0.45) / 0.55);
+        pose.sh = lerp(lerp(lerp(pose.sh, 2.7, up), 0.45, down), pose.sh, back);
+        pose.el = lerp(lerp(lerp(pose.el, 1.7, up), 0.25, down), pose.el, back);
+        pose.spread = side * lerp(0.12, 0.3, up * (1 - down));
+      } else if (ws.act === 'recoil') {
+        const k = Math.sin(Math.PI * clamp(ws.phase, 0, 1));
+        pose.sh += k * 0.8;
+        pose.el += k * 0.5;
+      }
+      return true;
+    }
+    if (w === 'spear') {
+      // carried upright; aiming lifts it overhand, point forward; jab thrusts at the hip.
+      pose.sh = 0.25 + walkSwing;
+      pose.el = 1.1;
+      pose.spread = side * 0.14;
+      pose.wrist = 0;
+      const a = ease(ws.aim);
+      if (a > 0) {
+        pose.sh = lerp(pose.sh, 2.75, a);
+        pose.el = lerp(pose.el, 0.7, a);
+        pose.spread = side * lerp(0.14, 0.3, a);
+        pose.wrist = lerp(0, 0.05 - 3.45, a);
+      }
+      if (ws.act === 'jab') {
+        const k = ws.phase < 0.3 ? ease(ws.phase / 0.3) : 1 - ease((ws.phase - 0.3) / 0.7);
+        pose.sh = lerp(pose.sh, 1.25, k);
+        pose.el = lerp(pose.el, 0.25, k);
+        pose.wrist = lerp(pose.wrist, -1.5, k);
+      } else if (ws.act === 'throw') {
+        const k = ease(ws.phase / 0.35);
+        pose.sh = lerp(2.75, 0.9, k);
+        pose.el = lerp(0.7, 0.2, k);
+        pose.wrist = 0.05 - pose.sh - pose.el;
+      }
+      return true;
+    }
+    if (bow) {
+      const d = Math.max(ws.draw, ws.aim);
+      pose.sh = lerp(0.35 + walkSwing, 1.5, ease(d * 4));
+      pose.el = lerp(0.35, 0.05, ease(d * 4));
+      pose.spread = side * lerp(0.1, -0.08, ease(d * 4));
+      pose.wrist = 0;
+      return true;
+    }
+    return false;
+  }
+
+  /** Blend `pose` toward the pack (over the shoulder) and, for food, the mouth. Returns reach weight. */
+  private reachPose(pose: ArmPose, r: Reach, k: number, side: -1 | 1): number {
+    const PACK: ArmPose = { sh: 2.55, el: 2.05, spread: side * 0.5, wrist: 0 };
+    const MOUTH: ArmPose = { sh: 1.2, el: 2.3, spread: side * -0.32, wrist: 0 };
+    const WRAP: ArmPose = { sh: 0.95, el: 1.5, spread: side * -0.4, wrist: 0 };
+    const mix = (a: ArmPose, b: ArmPose, t: number) => {
+      a.sh = lerp(a.sh, b.sh, t);
+      a.el = lerp(a.el, b.el, t);
+      a.spread = lerp(a.spread, b.spread, t);
+      a.wrist = lerp(a.wrist, b.wrist, t);
+    };
+    let w = 0;
+    if (r.kind === 'take') {
+      w = k < 0.35 ? ease(k / 0.35) : k < 0.47 ? 1 : 1 - ease((k - 0.47) / 0.53);
+      mix(pose, PACK, w);
+    } else if (r.kind === 'stow') {
+      // bring it up in front, then over the shoulder into the pack
+      const show = ease(k / 0.15) * (1 - ease((k - 0.2) / 0.15));
+      mix(pose, { sh: 0.7, el: 1.0, spread: side * 0.1, wrist: 0 }, show);
+      w = k < 0.2 ? 0 : k < 0.45 ? ease((k - 0.2) / 0.25) : k < 0.55 ? 1 : 1 - ease((k - 0.55) / 0.45);
+      mix(pose, PACK, w);
+    } else {
+      // eat / bandage: out of the pack, to the mouth (or the other arm), chew/wrap, back
+      w = k < 0.2 ? ease(k / 0.2) : k < 0.3 ? 1 : 1 - ease((k - 0.3) / 0.15);
+      mix(pose, PACK, w);
+      const tgt = r.kind === 'eat' ? MOUTH : WRAP;
+      const u = k < 0.3 ? 0 : k < 0.45 ? ease((k - 0.3) / 0.15) : k < 0.85 ? 1 : 1 - ease((k - 0.85) / 0.15);
+      mix(pose, tgt, u);
+      if (u > 0.9) {
+        const tt = this.idleT;
+        if (r.kind === 'eat') pose.el += Math.sin(tt * 13) * 0.07;
+        else pose.spread += Math.sin(tt * 9) * 0.12 * side;
+      }
+      w = Math.max(w, u);
+    }
+    return w;
+  }
+
+  private onEquip(item: string | null) {
+    const prev = this.heldShown[1] ?? this.heldShown[0];
+    const to = item && ITEMS[item as keyof typeof ITEMS]?.equip ? item : null;
+    if (to) this.startReach('take', prev, to);
+    else if (prev) this.startReach('stow', prev, null);
+  }
+
+  private startReach(kind: ReachKind, from: string | null, to: string | null) {
+    if (this.quietT > 0 || this.ctx.game.state !== 'playing') return;
+    const p = this.ctx.player;
+    if (p.mode === 'crashed' || p.mode === 'dead') return;
+    if (this.reach && kind === 'stow' && this.reach.kind !== 'stow') return; // don't interrupt eating
+    const ws = this.weaponState();
+    const tool = ws.shown ? (HELD_XFORM[ws.shown]?.side ?? 1) : 0;
+    let side: -1 | 1;
+    const id = to ?? from;
+    if (kind === 'take' || (kind === 'stow' && from && HELD_XFORM[from])) side = (id && HELD_XFORM[id]?.side) || 1;
+    else side = tool > 0 ? -1 : 1; // the free hand
+    const dur = kind === 'eat' || kind === 'heal' ? 2.4 : kind === 'take' ? 1.0 : 1.05;
+    this.reach = { kind, t: 0, dur, side, from, to };
+  }
+
+  /** First person: show what you eat / put away in front of the camera. */
+  private updateFpProp() {
+    const r = this.reach;
+    let id: string | null = null;
+    const o = this.fpProp;
+    if (r && !this.tp) {
+      const k = r.t / r.dur;
+      if ((r.kind === 'eat' || r.kind === 'heal') && k > 0.22 && k < 0.9) {
+        id = r.to;
+        const up = ease((k - 0.22) / 0.2);
+        const down = ease((k - 0.8) / 0.1);
+        o.position.set(lerp(0.22, 0.05, up), lerp(-0.55, -0.2, up) - down * 0.4, lerp(-0.45, -0.32, up));
+        o.rotation.set(-0.9 + up * 0.5, 0.4 - up * 0.3, 0.2);
+        const bite = r.kind === 'eat' ? 1 - 0.35 * smoothstep(0.45, 0.8, k) : 1;
+        o.scale.setScalar(bite);
+        if (r.kind === 'eat' && k > 0.45) o.position.y += Math.sin(this.idleT * 13) * 0.008;
+      } else if (r.kind === 'stow' && r.from && k < 0.45) {
+        id = r.from;
+        const go = ease((k - 0.12) / 0.33);
+        const come = ease(k / 0.12);
+        o.position.set(lerp(0.14, 0.4, go), lerp(-0.55, -0.24, come) - go * 0.45, lerp(-0.42, -0.25, go));
+        o.rotation.set(-1.1, 0.5, 0.2 + go * 0.8);
+        o.scale.setScalar(1);
+      }
+    }
+    if (id !== this.fpShown) {
+      for (const c of o.children) c.visible = false;
+      this.fpShown = id;
+      if (id) {
+        let c = o.getObjectByName('prop-' + id);
+        if (!c) {
+          c = buildProp(id);
+          c.traverse((m) => {
+            if ((m as THREE.Mesh).isMesh) {
+              m.castShadow = false;
+              m.frustumCulled = false;
+            }
+          });
+          o.add(c);
+        }
+        c.visible = true;
+      }
+    }
+    o.visible = id !== null;
   }
 
   /** Two-bone leg from hip to ankle, knee bending toward `fwd`. */
   private solveLeg(leg: { thigh: THREE.Mesh; shin: THREE.Mesh; knee: THREE.Mesh }, hip: THREE.Vector3, ankle: THREE.Vector3, fwd: THREE.Vector3) {
     // Ankle sits at the boot cuff, so the chain from hip to cuff is shorter than a full leg.
-    const L1 = 0.41,
-      L2 = 0.35;
+    const L1 = 0.43,
+      L2 = 0.2;
     _z.subVectors(hip, ankle);
     let d = _z.length();
     const dir = _z.divideScalar(Math.max(d, 1e-4)); // ankle -> hip

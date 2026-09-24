@@ -47,6 +47,10 @@ export class PlayerController implements System {
   readonly loco: Locomotion;
   private rig: CameraRig;
   private body: Body;
+  /** Combat hands us third-person tool models to hold. */
+  registerHeld(id: string, obj: THREE.Object3D) {
+    this.body.registerHeld(id, obj);
+  }
   private spray = new SnowSpray();
   private ground: WorldGround;
   private controls: Controls = makeControls();
