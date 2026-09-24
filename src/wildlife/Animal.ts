@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { Species } from '../core/types';
 import type { ItemId } from '../core/Items';
 import { Layer, type Collider } from '../core/Physics';
-import { angleDelta, clamp, damp } from '../core/math';
+import { angleDelta, clamp, damp, smoothstep } from '../core/math';
 import type { Wildlife } from './Wildlife';
 import type { QuadRig } from './QuadRig';
 
@@ -162,7 +162,10 @@ export abstract class Animal {
     this.heading += this.turnVel * dt;
     // Sharp turns bleed speed.
     const turnPenalty = 1 - Math.min(0.6, Math.abs(d) / Math.PI);
-    const target = this.desiredSpeed * turnPenalty;
+    // A badly wounded animal can't hold a gallop: it slows and staggers as it weakens.
+    const hp = this.health / Math.max(1, this.maxHealth);
+    const wound = this.bleed > 0.25 ? 0.5 + 0.5 * smoothstep(0.08, 0.55, hp) : 1;
+    const target = this.desiredSpeed * turnPenalty * wound;
     const a = target > this.speed ? this.accel : this.accel * 1.6;
     this.speed += clamp(target - this.speed, -a * dt, a * dt);
 
@@ -246,10 +249,16 @@ export abstract class Animal {
   hurt(info: HurtInfo): boolean {
     if (!this.alive) return false;
     let dmg = info.damage;
-    if (info.collider?.tag === 'head') dmg *= 1.8;
+    const ranged = info.kind === 'arrow' || info.kind === 'spear';
+    const head = info.collider?.tag === 'head';
+    const vital = !head && this.isVital(info.collider);
+    if (head) dmg *= ranged ? 2.6 : 1.8;
+    else if (vital && ranged) dmg *= 1.1;
     this.health -= dmg;
     this.lastHurt = this.wl.ctx.time;
-    this.bleed += dmg * 0.012;
+    // Shot placement decides how a hunt ends: a heart/lung arrow bleeds out in seconds (the animal
+    // bolts, then drops within ~50-100 m); a gut/haunch hit bleeds slowly and leaves a long trail.
+    this.bleed += dmg * (ranged ? (vital ? 0.05 : 0.022) : 0.012);
     this.push.addScaledVector(_v.set(info.dir.x, 0, info.dir.z).normalize(), Math.min(4, dmg * 0.06));
     this.wl.ctx.sys.weapons?.effects?.blood(info.point, info.dir, Math.min(1.5, 0.4 + dmg / 40));
     if (this.health <= 0) {
@@ -261,6 +270,24 @@ export abstract class Animal {
   }
 
   protected onHurt(_info: HurtInfo) {}
+
+  /** The body collider nearest the head is the chest (heart/lungs): the vital zone. */
+  private isVital(c?: Collider): boolean {
+    if (!c || c.tag === 'head') return false;
+    const headC = this.colliders.find((x) => x.tag === 'head');
+    if (!headC) return false;
+    let best: Collider | null = null,
+      bd = Infinity;
+    for (const x of this.colliders) {
+      if (x.tag === 'head') continue;
+      const d = x.position.distanceToSquared(headC.position);
+      if (d < bd) {
+        bd = d;
+        best = x;
+      }
+    }
+    return best === c;
+  }
 
   die(by: ItemId | null, dir: THREE.Vector3) {
     if (!this.alive) return;

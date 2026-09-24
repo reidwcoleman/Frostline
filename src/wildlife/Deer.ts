@@ -73,8 +73,8 @@ export class Deer extends Animal {
       ears = 0,
       twitch = 0;
     q.lookTarget = null;
-    // Wounded animals are slower.
-    const hurt = clamp(this.health / this.maxHealth, 0.35, 1);
+    // Adrenaline: a hit deer still bolts hard; the base Animal locomotion slows it as it bleeds out.
+    const hurt = clamp(0.65 + this.health / this.maxHealth, 0.65, 1);
 
     switch (this.mode) {
       case 'graze': {
@@ -131,7 +131,8 @@ export class Deer extends Animal {
       case 'flee': {
         tailUp = 1;
         ears = 0.3;
-        const base = h ? h.fleeHeading : this.heading;
+        // A lone deer runs straight away from you, not wherever it happened to face.
+        const base = h ? h.fleeHeading : this.wl.headingFrom(this.pos) + Math.PI;
         this.zigPhase += dt * (1.3 + (this.slot % 3) * 0.2);
         const zig = Math.sin(this.zigPhase) * 0.45 + Math.sin(this.zigPhase * 2.7) * 0.15;
         let hd = base + zig;

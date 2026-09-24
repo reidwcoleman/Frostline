@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { GameContext, GameState, Species, System } from '../core/types';
 import { TREELINE } from '../core/World';
-import { clamp, smoothstep } from '../core/math';
+import { clamp, damp, smoothstep } from '../core/math';
 import { createAnimalMaterial, type AnimalMaterial } from './material';
 import { buildDeer, buildHare, buildWolf, type QuadModel } from './models';
 import { Animal } from './Animal';
@@ -50,7 +50,7 @@ export class Wildlife implements System {
   /** Dev: disable automatic spawning. */
   autoSpawn = true;
   private spawnT = 3;
-  private grace = 25;
+  private grace = 4;
   private wolfKills = 0;
   private frame = 0;
   private lastWolfSpawn = -999;
@@ -87,7 +87,7 @@ export class Wildlife implements System {
     this.herds.length = 0;
     this.flocks.length = 0;
     this.spawnT = 3;
-    this.grace = 25;
+    this.grace = 4;
     this.lastWolfSpawn = -999;
   }
 
@@ -165,7 +165,27 @@ export class Wildlife implements System {
 
   /** How far a prey animal notices the player (noise, crouching, wind, darkness). */
   detectRange(base: number, at: THREE.Vector3): number {
-    return base * this.playerNoise * this.windFactor(at) * (this.ctx.clock.isNight ? (this.torchLit ? 1.2 : 0.75) : 1);
+    return base * this.playerNoise * this.windFactor(at) * this.coverFactor(at) * (this.ctx.clock.isNight ? (this.torchLit ? 1.2 : 0.75) : 1);
+  }
+
+  /**
+   * Visual cover between the animal and the player: trunks and boughs along the sight line hide
+   * you (stalk through the forest edge, don't walk across the open meadow). Scent (wind) and noise
+   * still carry, so cover never makes you invisible — floor of ~0.45.
+   */
+  coverFactor(at: THREE.Vector3): number {
+    const w = this.ctx.world;
+    const dx = this.player.x - at.x,
+      dz = this.player.z - at.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 6) return 1;
+    let trees = 0;
+    for (const f of [0.3, 0.55, 0.8]) {
+      w.forEachTree(at.x + dx * f, at.z + dz * f, 2.6, () => {
+        trees++;
+      });
+    }
+    return Math.max(0.45, 1 - trees * 0.12);
   }
 
   /** Downwind of the player = smells you from further away. */
@@ -323,7 +343,8 @@ export class Wildlife implements System {
       this.grace -= dt;
       this.spawnT -= dt;
       if (this.spawnT <= 0 && this.grace <= 0) {
-        this.spawnT = 1.25;
+        const living = this.count(() => true);
+        this.spawnT = living < 12 ? 0.35 : 1.0;
         this.spawner();
       }
     }
@@ -332,6 +353,7 @@ export class Wildlife implements System {
     const dark = 1 - ctx.env.daylight;
     this.mat.glow.value = smoothstep(0.3, 0.95, dark) * 0.55;
     this.mat.rim.value.copy(ctx.env.skyColor).multiplyScalar(0.18 + 0.3 * ctx.env.daylight);
+    this.mat.snow.value = damp(this.mat.snow.value, smoothstep(0.15, 0.7, ctx.env.snowfall) * 0.75, 0.2, dt);
   }
 
   private step(a: Animal, dt: number, full: boolean) {
@@ -382,7 +404,7 @@ export class Wildlife implements System {
     const twilight = (hour > 5.5 && hour < 9) || (hour > 16.5 && hour < 20);
 
     // Wolves: the night belongs to them. By day, rarely a cautious pair.
-    const packTarget = night ? (day >= 3 ? 4 : 3) : day >= 2 && Math.sin(clock.totalHours * 0.37) > 0.3 ? 2 : 1;
+    const packTarget = night ? (day >= 3 ? 4 : 3) : 2;
     const wolfCount = this.count((a) => a.species === 'wolf');
     if (this.packs.length < packTarget && ctx.time - this.lastWolfSpawn > 22 && living + 2 <= MAX_ANIMALS) {
       const size = night ? Math.min(6, 3 + (day >= 2 ? 1 : 0) + (day >= 4 ? 1 : 0)) : 2 + Math.floor(Math.random() * 2);
@@ -394,7 +416,7 @@ export class Wildlife implements System {
       }
     }
     // Deer herds in forest glades and valleys; they bed down at night.
-    const herdTarget = night ? 3 : 5;
+    const herdTarget = night ? 3 : 6;
     if (this.herds.length < herdTarget && living + 3 <= MAX_ANIMALS) {
       const pos = this.findSpawn(60, 220, (x, z) => this.okDeer(x, z));
       if (pos) {
@@ -403,7 +425,7 @@ export class Wildlife implements System {
       }
     }
     // Hares: forest edges, busiest at dawn/dusk.
-    const hareTarget = twilight ? 12 : night ? 6 : 9;
+    const hareTarget = twilight ? 12 : night ? 7 : 11;
     if (this.count((a) => a.species === 'rabbit') < hareTarget) {
       const pos = this.findSpawn(40, 160, (x, z) => this.okHare(x, z));
       if (pos) {
@@ -481,15 +503,15 @@ export class Wildlife implements System {
     const h = t.heightAt(x, z);
     if (h > TREELINE - 40 || t.slopeAngle(x, z) > 0.38 || t.lakeFactor(x, z) > 0.01) return false;
     // A glade: open right here, forest around.
-    if (this.treesNear(x, z, 7) > 0) return false;
-    const around = this.treesNear(x, z, 35);
-    return around >= 6 || t.flowAt(x, z) > 0.45;
+    if (this.treesNear(x, z, 4) > 1) return false;
+    const around = this.treesNear(x, z, 45);
+    return around >= 3 || t.flowAt(x, z) > 0.4;
   }
   private okHare(x: number, z: number) {
     const t = this.ctx.terrain;
     const h = t.heightAt(x, z);
     if (h > TREELINE + 20 || t.slopeAngle(x, z) > 0.45 || t.lakeFactor(x, z) > 0.01) return false;
-    return this.treesNear(x, z, 3) === 0 && this.treesNear(x, z, 20) >= 2;
+    return this.treesNear(x, z, 2) === 0 && this.treesNear(x, z, 30) >= 1;
   }
   private okPtarmigan(x: number, z: number) {
     const t = this.ctx.terrain;
