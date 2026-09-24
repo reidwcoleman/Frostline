@@ -38,7 +38,7 @@ export const SKI = {
   /** Static friction when stopped (a waxed ski starts to glide at ~4°). */
   muStatic: 0.07,
   /** Lateral edge grip, in g, when fully edged. Above it the skis skid. */
-  grip: { snow: 1.75, ice: 0.7, rock: 1.1, wood: 1.0 } as Record<string, number>,
+  grip: { snow: 2.05, ice: 0.82, rock: 1.25, wood: 1.15 } as Record<string, number>,
   /** Sliding (skid) friction as a fraction of the grip limit. */
   skidFactor: 0.62,
   /** Along-ski braking while skidding, as a fraction of the skid friction × sin(skid angle). */
@@ -47,15 +47,15 @@ export const SKI = {
   chatter: 0.3,
   chatterSpeed: [26, 44] as const,
   /** Quadratic air drag k (per meter): a = -k |v| v. 0.5·ρ·CdA/m with CdA≈0.6 m², m≈80 kg. */
-  drag: 0.0042,
-  tuckDrag: 0.6, // tuck removes ~40% of the drag
+  drag: 0.0033,
+  tuckDrag: 0.5, // tuck removes ~40% of the drag
   crouchDrag: 0.85,
   tuckGrip: 0.78, // weight back in a tuck: less edge
   /** Edge boost from A/D when it agrees with the turn. */
   edgeBoost: 1.3,
   /** Steering: skis turn toward the look yaw. */
-  steerGain: 7, // 1/s proportional gain
-  pivotRate: [5.0, 3.4] as const, // rad/s at low / high speed (how fast you can throw the skis)
+  steerGain: 9.5, // 1/s proportional gain
+  pivotRate: [6.4, 4.4] as const, // rad/s at low / high speed (how fast you can throw the skis)
   /** Look offset (rad) where you start over-rotating (skid) instead of carving cleanly. */
   overdrive: [0.5, 1.25] as const,
   keySteer: 0.6, // rad of extra steer target from A/D
@@ -132,4 +132,6 @@ export const CAM = {
   dipDamping: 11,
   maxShakeRot: 2.6 * DEG,
   maxShakePos: 0.045,
+  tpDistance: 4.2, // third-person chase distance (m)
+  tpHeight: 1.15, // extra height above the eye the chase cam sits at (m)
 } as const;

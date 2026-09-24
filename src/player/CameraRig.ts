@@ -1,10 +1,14 @@
 // First-person camera feel: crisp look (no smoothing), stance height, head bob synced to stride,
 // landing dip spring, carve lean, speed FOV kick, trauma-based shake, crash tumble and death camera.
+import * as THREE from 'three';
 import type { GameContext } from '../core/types';
 import { clamp, damp, lerp, smoothstep, TAU } from '../core/math';
 import { Simplex2 } from '../core/noise';
+import { Layer } from '../core/Physics';
 import { CAM, EYE, SKI } from './tuning';
 import type { Locomotion } from './Locomotion';
+
+const _tpDir = new THREE.Vector3();
 
 export class CameraRig {
   /** Current eye height above the feet (smoothed stance). */
@@ -31,6 +35,8 @@ export class CameraRig {
   private deadYaw = 0;
   /** Extra pitch applied while clipping skis on/off (looking down at the bindings). */
   private togglePitch = 0;
+  private tpOn = false;
+  private tpDist = 0;
   // Leg absorption: the head rides a filtered copy of the feet height.
   private headY = 0;
   private headVy = 0;
@@ -47,6 +53,7 @@ export class CameraRig {
     this.tumble = this.tumbleRoll = 0;
     this.deadT = -1;
     this.togglePitch = 0;
+    this.tpDist = this.tpOn ? CAM.tpDistance : 0;
     this.eye = this.ctx.player.onSkis ? EYE.ski : EYE.stand;
     this.headInit = false;
   }
@@ -86,6 +93,14 @@ export class CameraRig {
   kick(pitch: number, roll = 0) {
     this.kickPV += pitch * 14;
     this.kickRV += roll * 14;
+  }
+
+  /** Toggle the over-the-shoulder chase camera. Distance eases in/out over a beat. */
+  setThirdPerson(on: boolean) {
+    this.tpOn = on;
+  }
+  get thirdPerson() {
+    return this.tpOn;
   }
 
   startTumble(spin: number) {
@@ -227,6 +242,31 @@ export class CameraRig {
     if (camera.position.y < gy + 0.18) camera.position.y = gy + 0.18;
 
     const pitch = clamp(p.pitch + this.togglePitch, -CAM.pitchLimit, CAM.pitchLimit) + this.kickP + shP + tumbleP + deathP;
-    camera.rotation.set(pitch, p.yaw + shY + deathYaw, this.roll + this.kickR + shR + tumbleR + deathR + this.sway, 'YXZ');
+    const yaw = p.yaw + shY + deathYaw;
+    camera.rotation.set(pitch, yaw, this.roll + this.kickR + shR + tumbleR + deathR + this.sway, 'YXZ');
+
+    // ---- third person: pull the camera back over the shoulder along the (roll-free) look
+    // direction, riding up and stopping short of the terrain/any obstruction so it never clips.
+    this.tpDist = damp(this.tpDist, this.tpOn ? CAM.tpDistance : 0, 6, dt);
+    if (this.tpDist > 0.01) {
+      const cp = Math.cos(pitch);
+      const fx = -Math.sin(yaw) * cp,
+        fy = Math.sin(pitch),
+        fz = -Math.cos(yaw) * cp;
+      const eyeX = camera.position.x,
+        eyeY2 = camera.position.y,
+        eyeZ = camera.position.z;
+      let dist = this.tpDist;
+      _tpDir.set(-fx, -fy, -fz);
+      const hit = this.ctx.physics.raycast(camera.position, _tpDir, dist + 0.4, { mask: Layer.SOLID });
+      if (hit) dist = Math.max(0.4, hit.distance - 0.35);
+      const upBoost = CAM.tpHeight * smoothstep(0, CAM.tpDistance, dist);
+      let cx = eyeX - fx * dist,
+        cy = eyeY2 - fy * dist + upBoost,
+        cz = eyeZ - fz * dist;
+      const gy = terrain.heightAt(cx, cz) + 0.3;
+      if (cy < gy) cy = gy;
+      camera.position.set(cx, cy, cz);
+    }
   }
 }

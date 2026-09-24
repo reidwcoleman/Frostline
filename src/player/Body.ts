@@ -67,6 +67,7 @@ export class Body {
   private handL = new THREE.Vector3();
   private rightHand: THREE.Group;
   private leftHand: THREE.Group;
+  private tp = false;
 
   constructor(private ctx: GameContext, viewmodel: THREE.Group, rightHand: THREE.Group, leftHand: THREE.Group) {
     this.rightHand = rightHand;
@@ -146,6 +147,23 @@ export class Body {
     });
   }
 
+  /** Third person: give the world-space shadow-proxy body real materials so it's actually visible,
+   *  and hide the camera-space arms/poles (they only make sense seen from inside the head). */
+  setThirdPerson(on: boolean) {
+    const m = this.mats;
+    const [torso, head, arms] = this.shadowProxy.children as THREE.Mesh[];
+    torso.material = on ? m.jacket : m.shadowOnly;
+    arms.material = on ? m.jacket : m.shadowOnly;
+    head.material = on ? m.jacketShade : m.shadowOnly;
+    for (const { thigh, shin, knee } of this.legs) {
+      thigh.material = on ? m.pants : m.shadowOnly;
+      shin.material = on ? m.pants : m.shadowOnly;
+      knee.material = on ? m.pants : m.shadowOnly;
+    }
+    this.tp = on;
+    this.torso.visible = !on && this.armsVis > 0.02;
+  }
+
   reset() {
     const p = this.ctx.player;
     this.skiVis = p.onSkis ? 1 : 0;
@@ -184,7 +202,7 @@ export class Body {
     const armsOn = !hidden && alive && (p.onSkis || equipped !== null) && !(toggling && !loco.toggleTo && loco.toggleT > SKI.toggleTime * 0.6);
     this.armsVis = damp(this.armsVis, armsOn ? 1 : 0, 10, dt);
     this.updateArms(dt, loco, equipped);
-    this.torso.visible = this.armsVis > 0.02;
+    this.torso.visible = !this.tp && this.armsVis > 0.02;
   }
 
   // ------------------------------------------------------------------ world-space skis & legs

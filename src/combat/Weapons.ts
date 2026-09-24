@@ -82,6 +82,7 @@ const _qc = new THREE.Quaternion();
 const _eu = new THREE.Euler();
 const _fwd = new THREE.Vector3(0, 0, -1);
 const _fwdN = new THREE.Vector3(0, 0, -1);
+const _tp = new THREE.Vector3();
 
 function ease(e: Ease | undefined, t: number) {
   switch (e) {
@@ -508,9 +509,28 @@ export class Weapons implements System {
       point.lerp(c.position, 0.35);
       best = { kind: 'collider', distance: dist, point, normal: _w.clone().negate().normalize(), index: -1, collider: c };
     }
+    // Trees: forgiving cone against the trunk line, not just the thin trunk-cylinder surface —
+    // swinging at a tree should land the hit without having to aim through the branches.
+    const world = ctx.world;
+    world.forEachTree(_o.x, _o.z, reach + 2, (i) => {
+      const ty = world.treeY[i];
+      const th = world.treeHeight(i);
+      _tp.set(world.treeX[i] - _o.x, ty - _o.y, world.treeZ[i] - _o.z);
+      const t = _tp.dot(_d);
+      if (t < 0.15 || t > reach + 1.1) return;
+      const perp = Math.sqrt(Math.max(0, _tp.lengthSq() - t * t));
+      const forgive = Math.max(0.9, world.treeRadius(i) * 2.2);
+      if (perp > forgive) return;
+      const dist = Math.max(0.15, t - forgive * 0.5);
+      if (best && dist >= best.distance) return;
+      // Aim the reported hit point at chest height on the trunk so felling/chop fx land correctly.
+      const point = new THREE.Vector3(world.treeX[i], clamp(_o.y + t * _d.y, ty, ty + Math.min(th * 0.6, 2.4)), world.treeZ[i]);
+      const normal = new THREE.Vector3(-_d.x, 0, -_d.z).normalize();
+      best = { kind: 'tree', distance: dist, point, normal, index: i };
+    });
     if (best) {
       // Something solid in between wins.
-      if (ray && ray.kind !== 'collider' && ray.distance < best.distance - 0.15) return ray;
+      if (ray && ray.kind !== 'collider' && ray.kind !== 'tree' && ray.distance < best.distance - 0.15) return ray;
       return best;
     }
     if (ray) return ray;

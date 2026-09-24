@@ -203,13 +203,16 @@ void terrainSurface() {
     vec2 gz = (rz.xy - 0.5) * 4.0 * (8.0 / amp) + (bz.xy - 0.5) * 4.0 * 0.21 * 3.0;
     vec2 gy = (ry.xy - 0.5) * 4.0;
     vec3 grad = w.x * vec3(0.0, gx.y, gx.x) + w.z * vec3(gz.x, gz.y, 0.0) + w.y * vec3(gy.x, 0.0, gy.y);
-    float strataY = (P.y + dot(P.xz, vec2(0.11, 0.06)) + (nB.r - 0.5) * 8.0) / 5.0;
+    // Vary the stratum period with slow noise so bands don't read as a perfectly uniform,
+    // mechanical staircase wall — real cliff faces break, offset and thicken irregularly.
+    float period = 5.0 + (nA.r - 0.5) * 3.5 + (nB.g - 0.5) * 2.0;
+    float strataY = (P.y + dot(P.xz, vec2(0.11, 0.06)) + (nB.r - 0.5) * 8.0) / period;
     float band = fract(strataY);
     float bandId = floor(strataY);
-    // Ledges are ~5 m apart: fade them before they turn into sub-pixel hatching.
-    float ledge = smoothstep(0.84, 0.93, band) * (1.0 - smoothstep(0.96, 1.0, band)) * (1.0 - smoothstep(180.0, 420.0, dist));
-    // Step profile: each stratum overhangs slightly -> up-facing lip at its top.
-    grad.y += (smoothstep(0.8, 0.95, band) - 0.25) * 0.8;
+    // Ledges fade out well before mid-range so distant faces read as solid rock mass, not a barcode.
+    float ledge = smoothstep(0.84, 0.93, band) * (1.0 - smoothstep(0.96, 1.0, band)) * (1.0 - smoothstep(90.0, 240.0, dist));
+    // Step profile: each stratum overhangs slightly -> up-facing lip at its top (softened).
+    grad.y += (smoothstep(0.8, 0.95, band) - 0.25) * 0.5;
     float detailFade = 1.0 - smoothstep(60.0, 260.0, dist);
     Nr = normalize(Nm - (grad - dot(grad, Nm) * Nm) * mix(0.35, 0.9, detailFade));
     float h = w.x * (rx.z * 0.6 + bx.z * 0.4) + w.z * (rz.z * 0.6 + bz.z * 0.4) + w.y * ry.z;

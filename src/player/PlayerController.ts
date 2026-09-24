@@ -52,6 +52,8 @@ export class PlayerController implements System {
   private controls: Controls = makeControls();
   private steerYaw = 0;
   private freelookReturn = false;
+  /** Over-the-shoulder chase camera, toggled with the `toggleView` action (V). */
+  thirdPerson = false;
   private glideLoop: LoopHandle | null = null;
   private carveLoop: LoopHandle | null = null;
   private glideVol = 0;
@@ -152,6 +154,12 @@ export class PlayerController implements System {
     if (dev.fly) {
       this.flyUpdate(dt, c);
       return;
+    }
+
+    if (this.ctx.input.pressed('toggleView') && !this.ctx.ui.blocking) {
+      this.thirdPerson = !this.thirdPerson;
+      this.rig.setThirdPerson(this.thirdPerson);
+      this.body.setThirdPerson(this.thirdPerson);
     }
 
     this.prevPos.copy(p.position);

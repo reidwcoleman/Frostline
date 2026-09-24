@@ -10,7 +10,7 @@ export type Action =
   | 'inventory' | 'crafting' | 'build' | 'map' | 'pause'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6'
   | 'nextSlot' | 'prevSlot' | 'holster'
-  | 'rotate' | 'demolish';
+  | 'rotate' | 'demolish' | 'toggleView';
 
 export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
@@ -41,6 +41,7 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   holster: ['KeyH', 'Pad14'],
   rotate: ['KeyR', 'Pad15'],
   demolish: ['KeyZ'],
+  toggleView: ['KeyV'],
 };
 
 /** Human-readable label for a binding code (for key caps in the UI). */

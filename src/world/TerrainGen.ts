@@ -17,7 +17,7 @@
 import { Simplex2 } from '../core/noise';
 import { mulberry32, smoothstep, clamp, lerp } from '../core/math';
 
-export const TERRAIN_GEN_VERSION = 8;
+export const TERRAIN_GEN_VERSION = 9;
 
 export interface TerrainData {
   seed: number;
@@ -216,8 +216,8 @@ const DEFAULTS = {
   Ac: 12_000, // channel-head drainage area (m^2); below it only hillslope processes act
   it1: 110,
   it2: 45,
-  talus: 42, // threshold hillslope angle (deg)
-  talusVar: 6,
+  talus: 36, // threshold hillslope angle (deg)
+  talusVar: 15, // per-region variation: some peaks rounded and gentle, others craggy
   cliff: 0, // extra degrees inside cliff bands
   glacA: 60_000,
   glacW: 0,
