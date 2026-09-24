@@ -52,8 +52,8 @@ export class PlayerController implements System {
   private controls: Controls = makeControls();
   private steerYaw = 0;
   private freelookReturn = false;
-  /** Over-the-shoulder chase camera, toggled with the `toggleView` action (V). */
-  thirdPerson = false;
+  /** Over-the-shoulder chase camera, toggled with the `toggleView` action (V). Default view. */
+  thirdPerson = true;
   private glideLoop: LoopHandle | null = null;
   private carveLoop: LoopHandle | null = null;
   private glideVol = 0;
@@ -120,6 +120,8 @@ export class PlayerController implements System {
   reset() {
     const p = this.ctx.player;
     this.loco.reset();
+    this.rig.setThirdPerson(this.thirdPerson);
+    this.body.setThirdPerson(this.thirdPerson);
     this.rig.reset();
     this.body.reset();
     this.spray.clear();

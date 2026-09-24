@@ -34,28 +34,28 @@ export const WALK = {
 
 export const SKI = {
   /** Along-ski kinetic friction coefficients by surface. */
-  mu: { snow: 0.04, ice: 0.015, rock: 0.3, wood: 0.1 } as Record<string, number>,
+  mu: { snow: 0.026, ice: 0.01, rock: 0.3, wood: 0.1 } as Record<string, number>,
   /** Static friction when stopped (a waxed ski starts to glide at ~4°). */
-  muStatic: 0.07,
+  muStatic: 0.055,
   /** Lateral edge grip, in g, when fully edged. Above it the skis skid. */
-  grip: { snow: 2.05, ice: 0.82, rock: 1.25, wood: 1.15 } as Record<string, number>,
+  grip: { snow: 2.2, ice: 0.9, rock: 1.3, wood: 1.2 } as Record<string, number>,
   /** Sliding (skid) friction as a fraction of the grip limit. */
   skidFactor: 0.62,
   /** Along-ski braking while skidding, as a fraction of the skid friction × sin(skid angle). */
   skidAlongBrake: 0.6,
   /** Grip lost to chatter at very high speed (fraction at `chatterSpeed[1]`). */
   chatter: 0.3,
-  chatterSpeed: [26, 44] as const,
+  chatterSpeed: [34, 58] as const,
   /** Quadratic air drag k (per meter): a = -k |v| v. 0.5·ρ·CdA/m with CdA≈0.6 m², m≈80 kg. */
-  drag: 0.0033,
-  tuckDrag: 0.5, // tuck removes ~40% of the drag
+  drag: 0.0024,
+  tuckDrag: 0.44, // tuck removes over half the drag
   crouchDrag: 0.85,
   tuckGrip: 0.78, // weight back in a tuck: less edge
   /** Edge boost from A/D when it agrees with the turn. */
   edgeBoost: 1.3,
   /** Steering: skis turn toward the look yaw. */
-  steerGain: 9.5, // 1/s proportional gain
-  pivotRate: [6.4, 4.4] as const, // rad/s at low / high speed (how fast you can throw the skis)
+  steerGain: 11, // 1/s proportional gain
+  pivotRate: [7.2, 5.0] as const, // rad/s at low / high speed (how fast you can throw the skis)
   /** Look offset (rad) where you start over-rotating (skid) instead of carving cleanly. */
   overdrive: [0.5, 1.25] as const,
   keySteer: 0.6, // rad of extra steer target from A/D
@@ -67,8 +67,8 @@ export const SKI = {
   plowMax: 5.2,
   plowHoldSlope: 20 * DEG,
   /** Pole push / skating on the flat. */
-  poleAccel: 3.4, // peak push accel
-  poleMaxSpeed: 7.5, // pushes fade out approaching this speed
+  poleAccel: 4.2, // peak push accel
+  poleMaxSpeed: 9, // pushes fade out approaching this speed
   poleCycle: 0.95, // seconds per push stride
   skateDrain: 7,
   /** Herringbone / side-step climbing. */

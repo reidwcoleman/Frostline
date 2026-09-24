@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import type { GameContext } from '../core/types';
 import { clamp, damp, dampAngle, lerp, smoothstep, TAU } from '../core/math';
-import { buildArm, buildPole, buildSkiAssembly, buildSkiGeometry, makeMaterials, type GearMaterials, type SkiAssembly } from './Gear';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { buildArm, buildPole, buildSkiAssembly, buildSkiGeometry, makeMaterials, PALETTE, type GearMaterials, type SkiAssembly } from './Gear';
 import type { Locomotion } from './Locomotion';
 import { SKI } from './tuning';
 
@@ -40,6 +41,9 @@ export class Body {
   private legs: { thigh: THREE.Mesh; shin: THREE.Mesh; knee: THREE.Mesh }[] = [];
   private shadowProxy: THREE.Group;
   private mats: GearMaterials;
+  private pack!: THREE.Mesh[];
+  private packBuckle!: THREE.Mesh;
+  private packAccent!: THREE.MeshStandardMaterial;
 
   // camera space
   private torso = new THREE.Group();
@@ -120,6 +124,41 @@ export class Body {
     }
     this.world.add(this.shadowProxy);
 
+    // ---- backpack: rides on the torso (local -Z is the ski/look forward direction, so a
+    // positive Z offset sits it on the back). Only meaningful seen from outside -> third person.
+    this.packAccent = new THREE.MeshStandardMaterial({ color: PALETTE.accent, roughness: 0.6 });
+    const packBody = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.34, 0.16, 3, 0.035), m.shadowOnly);
+    packBody.name = 'packBody';
+    const packLid = new THREE.Mesh(new RoundedBoxGeometry(0.25, 0.1, 0.17, 3, 0.03), m.shadowOnly);
+    packLid.name = 'packLid';
+    packLid.position.y = 0.2;
+    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.26, 12), m.shadowOnly);
+    roll.name = 'packRoll';
+    roll.rotation.z = Math.PI / 2;
+    roll.position.y = -0.19;
+    const buckle = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.007, 6, 12), m.shadowOnly);
+    buckle.name = 'packBuckle';
+    this.packBuckle = buckle;
+    buckle.position.set(0, 0.05, -0.09);
+    const strapGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.4, 6);
+    const strapL = new THREE.Mesh(strapGeo, m.shadowOnly);
+    strapL.name = 'strapL';
+    strapL.position.set(-0.11, 0.12, -0.08);
+    strapL.rotation.x = -0.55;
+    const strapR = strapL.clone();
+    strapR.name = 'strapR';
+    strapR.position.x = 0.11;
+    this.pack = [packBody, packLid, roll, strapL, strapR];
+    const packGroup = new THREE.Group();
+    packGroup.name = 'pack';
+    packGroup.position.set(0, 0.08, 0.16);
+    for (const o of [...this.pack, buckle]) {
+      o.castShadow = true;
+      o.frustumCulled = false;
+      packGroup.add(o);
+    }
+    torso.add(packGroup);
+
     // ---- camera space: arms, mittens, poles
     viewmodel.add(this.torso);
     this.torso.add(rightHand, leftHand);
@@ -160,6 +199,8 @@ export class Body {
       shin.material = on ? m.pants : m.shadowOnly;
       knee.material = on ? m.pants : m.shadowOnly;
     }
+    for (const o of this.pack) o.material = on ? m.jacketShade : m.shadowOnly;
+    this.packBuckle.material = on ? this.packAccent : m.shadowOnly;
     this.tp = on;
     this.torso.visible = !on && this.armsVis > 0.02;
   }
