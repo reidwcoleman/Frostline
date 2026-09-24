@@ -44,6 +44,13 @@ export class Body {
   private pack!: THREE.Mesh[];
   private packBuckle!: THREE.Mesh;
   private packAccent!: THREE.MeshStandardMaterial;
+  private torsoMesh!: THREE.Mesh;
+  private headMesh!: THREE.Mesh;
+  private shouldersMesh!: THREE.Mesh;
+  private hoodBrimMesh!: THREE.Mesh;
+  private wArmL!: THREE.Group;
+  private wArmR!: THREE.Group;
+  private armSwing = 0;
 
   // camera space
   private torso = new THREE.Group();
@@ -108,21 +115,55 @@ export class Body {
       this.legs.push({ thigh, shin, knee });
     }
 
-    // ---- shadow-only torso + head so the sun casts a whole skier.
+    // ---- shadow-only torso + head so the sun casts a whole skier. Third person (setThirdPerson)
+    // swaps these to real materials so the body actually reads as a person from outside: a
+    // shouldered torso, a hooded head, and two jointed arms that swing with the stride.
     this.shadowProxy = new THREE.Group();
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.42, 4, 10), m.shadowOnly);
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.185, 0.44, 4, 10), m.shadowOnly);
     torso.name = 'torso';
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), m.shadowOnly);
+    const shoulders = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.12, 0.24, 3, 0.05), m.shadowOnly);
+    shoulders.name = 'shoulders';
+    shoulders.position.y = 0.2;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.125, 14, 10), m.shadowOnly);
     head.name = 'head';
-    const armsProxy = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.5, 3, 6), m.shadowOnly);
-    armsProxy.name = 'arms';
-    armsProxy.rotation.z = Math.PI / 2;
-    for (const o of [torso, head, armsProxy]) {
+    head.scale.y = 0.94;
+    const hoodBrim = new THREE.Mesh(new THREE.TorusGeometry(0.108, 0.02, 8, 20), m.shadowOnly);
+    hoodBrim.name = 'hoodBrim';
+    hoodBrim.rotation.x = Math.PI / 2;
+    hoodBrim.position.y = -0.05;
+    head.add(hoodBrim);
+    torso.add(shoulders);
+    for (const o of [torso, shoulders, head, hoodBrim]) {
       o.castShadow = true;
       o.frustumCulled = false;
-      this.shadowProxy.add(o);
     }
+    this.shadowProxy.add(torso, head);
     this.world.add(this.shadowProxy);
+    this.torsoMesh = torso;
+    this.headMesh = head;
+    this.shouldersMesh = shoulders;
+    this.hoodBrimMesh = hoodBrim;
+
+    // ---- two real arms (shoulder pivot -> capsule -> mitten hand), swung by the gait each frame.
+    const buildWorldArm = (side: -1 | 1) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.21, 0.22, 0);
+      const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.28, 4, 8), m.shadowOnly);
+      upper.name = 'armUpper';
+      upper.position.set(0, -0.2, 0);
+      const hand = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.1, 0.09, 4, 0.03), m.shadowOnly);
+      hand.name = 'armHand';
+      hand.position.set(0, -0.4, 0);
+      for (const o of [upper, hand]) {
+        o.castShadow = true;
+        o.frustumCulled = false;
+        pivot.add(o);
+      }
+      torso.add(pivot);
+      return pivot;
+    };
+    this.wArmL = buildWorldArm(-1);
+    this.wArmR = buildWorldArm(1);
 
     // ---- backpack: rides on the torso (local -Z is the ski/look forward direction, so a
     // positive Z offset sits it on the back). Only meaningful seen from outside -> third person.
@@ -190,10 +231,15 @@ export class Body {
    *  and hide the camera-space arms/poles (they only make sense seen from inside the head). */
   setThirdPerson(on: boolean) {
     const m = this.mats;
-    const [torso, head, arms] = this.shadowProxy.children as THREE.Mesh[];
-    torso.material = on ? m.jacket : m.shadowOnly;
-    arms.material = on ? m.jacket : m.shadowOnly;
-    head.material = on ? m.jacketShade : m.shadowOnly;
+    this.torsoMesh.material = on ? m.jacket : m.shadowOnly;
+    this.shouldersMesh.material = on ? m.jacket : m.shadowOnly;
+    this.headMesh.material = on ? m.jacketShade : m.shadowOnly;
+    this.hoodBrimMesh.material = on ? m.jacketShade : m.shadowOnly;
+    for (const pivot of [this.wArmL, this.wArmR]) {
+      const [upper, hand] = pivot.children as THREE.Mesh[];
+      upper.material = on ? m.jacket : m.shadowOnly;
+      hand.material = on ? m.mitten : m.shadowOnly;
+    }
     for (const { thigh, shin, knee } of this.legs) {
       thigh.material = on ? m.pants : m.shadowOnly;
       shin.material = on ? m.pants : m.shadowOnly;
@@ -349,16 +395,25 @@ export class Body {
       this.solveLeg(leg, _b, _a, _f);
     }
 
-    // Shadow proxy: torso over the hips, head at the eye.
-    const torso = this.shadowProxy.children[0];
-    const head = this.shadowProxy.children[1];
-    const arms = this.shadowProxy.children[2];
+    // Shadow proxy: torso over the hips, head at the eye. Shoulders/arms are children of torso
+    // and follow it automatically; only their local swing needs setting here.
+    const torso = this.torsoMesh;
+    const head = this.headMesh;
     torso.position.set(0, hipH + 0.4, 0).addScaledVector(_x, leanShift * 0.6).addScaledVector(_f, -back * 0.3 + loco.tuck * 0.2);
     torso.rotation.set(0, this.skiYaw, 0);
     torso.rotateX(-0.25 - loco.tuck * 0.9);
     head.position.set(0, eye - 0.05, 0).addScaledVector(_x, leanShift * 0.3);
-    arms.position.set(0, hipH + 0.45, 0).addScaledVector(_f, 0.25);
-    arms.rotation.set(0, this.skiYaw, Math.PI / 2, 'YXZ');
+
+    // Arm swing: opposite-leg gait while walking, a gentle tuck-forward hang while skiing/idle.
+    let swingTarget = 0;
+    if (!onSkis) {
+      const ph = (loco.stepIndex + loco.strideDist / Math.max(loco.strideLen, 0.1)) * Math.PI;
+      swingTarget = Math.sin(ph) * smoothstep(0.2, 1.8, p.speed) * 0.6;
+    }
+    this.armSwing = damp(this.armSwing, swingTarget, 8, dt);
+    const tuckFold = loco.tuck * 0.9;
+    this.wArmL.rotation.set(0.12 + this.armSwing + tuckFold, 0, 0.1);
+    this.wArmR.rotation.set(0.12 - this.armSwing + tuckFold, 0, -0.1);
   }
 
   /** Two-bone leg from hip to ankle, knee bending toward `fwd`. */

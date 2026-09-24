@@ -17,7 +17,7 @@ export const WALK = {
   airAccel: 1.4,
   jumpSpeed: 4.3, // ~0.95 m hop
   /** Steepest grade you can walk up. */
-  maxClimb: 38 * DEG,
+  maxClimb: 44 * DEG,
   /** Beyond this the snow won't hold you: you slide. */
   slideAngle: 43 * DEG,
   slideFriction: 0.28,
@@ -72,8 +72,8 @@ export const SKI = {
   poleCycle: 0.95, // seconds per push stride
   skateDrain: 7,
   /** Herringbone / side-step climbing. */
-  climbSpeed: 1.1,
-  climbMax: 33 * DEG,
+  climbSpeed: 1.7,
+  climbMax: 40 * DEG,
   climbStartGrade: 7 * DEG,
   climbDrain: 5,
   /** Ollie: hold jump to charge (s), release to pop along the normal. */
