@@ -226,6 +226,8 @@ const DEFAULTS = {
   uA1: 1_000_000,
   strata: 95, // cliff band spacing (m)
   mode: 1, // 0 = stream-power sim, 1 = glacial troughs
+  kd: 0.1, // hillslope diffusion per iteration (grid units)
+  rpow: 0, // 1 = power-law relief remap instead of the cubic
   hyb: 0, // stream-power iterations after the troughs
   mamp: 0.85, // massif amplitude
   tD: 380, // trough depth scale (m)
@@ -478,6 +480,7 @@ function streamPower(g: Grid, iters: number, prog: (p: number) => void): SimResu
   const mExp = P.mExp;
   const sAc = Math.pow(P.Ac, mExp);
   const eps = 1e-3;
+  const tmp = new Float64Array(N);
 
   const sp = P.strata;
   for (let it = 0; it <= iters; it++) {
@@ -558,6 +561,16 @@ function streamPower(g: Grid, iters: number, prog: (p: number) => void): SimResu
       const lim = h[r] + (sa > 0 && P.chanTan > 0 ? P.chanTan : t) * L;
       if (hk > lim) hk = lim;
       h[k] = hk;
+    }
+    // Hillslope diffusion: rounds off cell-scale flow-line striping on threshold faces.
+    if (P.kd > 0) {
+      tmp.set(h);
+      for (let j = 1; j < R - 1; j++)
+        for (let i = 1; i < R - 1; i++) {
+          const k = j * R + i;
+          if (outlet[k]) continue;
+          h[k] = tmp[k] + P.kd * (tmp[k - 1] + tmp[k + 1] + tmp[k - R] + tmp[k + R] - 4 * tmp[k]);
+        }
     }
     if ((it & 7) === 0) prog(it / iters);
   }
@@ -783,7 +796,7 @@ function reliefRemap(h: Float64Array, R: number, rad: number) {
     // Blend toward the remap only where there is real relief.
     const w = smoothstep(40, 160, span);
     // Cubic with g(0)=0, g'(0)=0, g(1)=1, g'(1)=p: flat floors, crest steepening capped at p.
-    const g = (3 - p) * t * t + (p - 2) * t * t * t;
+    const g = P.rpow ? Math.pow(t, p) : (3 - p) * t * t + (p - 2) * t * t * t;
     h[k] = lerp(h[k], F[k] + span * g, w);
   }
 }
