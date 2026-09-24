@@ -22,7 +22,7 @@ interface FireInfo {
 
 const _v = new THREE.Vector3();
 const _look = new THREE.Vector3();
-const MAX_ANIMALS = 20;
+const MAX_ANIMALS = 56;
 
 export class Wildlife implements System {
   readonly name = 'wildlife';
@@ -382,28 +382,28 @@ export class Wildlife implements System {
     const twilight = (hour > 5.5 && hour < 9) || (hour > 16.5 && hour < 20);
 
     // Wolves: the night belongs to them. By day, rarely a cautious pair.
-    const packTarget = night ? (day >= 3 ? 2 : 1) : day >= 2 && Math.sin(clock.totalHours * 0.37) > 0.55 ? 1 : 0;
+    const packTarget = night ? (day >= 3 ? 4 : 3) : day >= 2 && Math.sin(clock.totalHours * 0.37) > 0.3 ? 2 : 1;
     const wolfCount = this.count((a) => a.species === 'wolf');
-    if (this.packs.length < packTarget && ctx.time - this.lastWolfSpawn > 45 && living + 2 <= MAX_ANIMALS) {
-      const size = night ? Math.min(4, 2 + (day >= 2 ? 1 : 0) + (day >= 4 ? 1 : 0) - (Math.random() < 0.3 ? 1 : 0)) : 2;
+    if (this.packs.length < packTarget && ctx.time - this.lastWolfSpawn > 22 && living + 2 <= MAX_ANIMALS) {
+      const size = night ? Math.min(6, 3 + (day >= 2 ? 1 : 0) + (day >= 4 ? 1 : 0)) : 2 + Math.floor(Math.random() * 2);
       const pos = this.findSpawn(130, 220, (x, z) => this.okWolf(x, z));
-      if (pos && wolfCount + size <= 8) {
+      if (pos && wolfCount + size <= 18) {
         this.spawnPack(pos.x, pos.z, Math.max(2, size));
         this.lastWolfSpawn = ctx.time;
         return;
       }
     }
     // Deer herds in forest glades and valleys; they bed down at night.
-    const herdTarget = night ? 1 : 2;
+    const herdTarget = night ? 3 : 5;
     if (this.herds.length < herdTarget && living + 3 <= MAX_ANIMALS) {
       const pos = this.findSpawn(60, 220, (x, z) => this.okDeer(x, z));
       if (pos) {
-        this.spawnHerd(pos.x, pos.z, 2 + Math.floor(Math.random() * 4));
+        this.spawnHerd(pos.x, pos.z, 3 + Math.floor(Math.random() * 5));
         return;
       }
     }
     // Hares: forest edges, busiest at dawn/dusk.
-    const hareTarget = twilight ? 5 : night ? 2 : 3;
+    const hareTarget = twilight ? 12 : night ? 6 : 9;
     if (this.count((a) => a.species === 'rabbit') < hareTarget) {
       const pos = this.findSpawn(40, 160, (x, z) => this.okHare(x, z));
       if (pos) {
@@ -412,7 +412,7 @@ export class Wildlife implements System {
       }
     }
     // Ptarmigan above the treeline.
-    if (this.flocks.length < 1 && living + 4 <= MAX_ANIMALS) {
+    if (this.flocks.length < 4 && living + 4 <= MAX_ANIMALS) {
       const pos = this.findSpawn(45, 200, (x, z) => this.okPtarmigan(x, z));
       if (pos) {
         this.spawnFlock(pos.x, pos.z, 3 + Math.floor(Math.random() * 4));
@@ -421,7 +421,7 @@ export class Wildlife implements System {
     }
     // Ravens by day.
     const ravens = this.count((a) => a instanceof Bird && a.kind === 'raven');
-    if (!night && ravens < 2) {
+    if (!night && ravens < 4) {
       const a = Math.random() * Math.PI * 2;
       const x = this.player.x + Math.sin(a) * 120,
         z = this.player.z + Math.cos(a) * 120;

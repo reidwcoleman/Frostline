@@ -471,7 +471,7 @@ export class Weapons implements System {
     const reach = a.kind === 'jab' ? 2.9 : a.kind === 'tswing' ? 2.2 : 2.4;
     const hit = this.meleeTrace(reach);
     if (!hit) return;
-    ctx.camera.getWorldDirection(_d);
+    ctx.player.lookDir(_d);
     const damage = a.kind === 'jab' ? 30 : a.kind === 'tswing' ? 8 : 34;
     const res = this.resolveHit(hit, _d, tool, damage, a.kind === 'tswing' ? 'torch' : 'melee');
     const pl = ctx.sys.player as unknown as { shake?: (x: number) => void; kick?: (p: number, r?: number) => void };
@@ -485,24 +485,30 @@ export class Weapons implements System {
     if (hard && a.kind === 'swing') this.act = { kind: 'recoil', keys: K_RECOIL, t: 0, dur: 0.44, hitAt: 99, hitDone: true, sound: -1 };
   }
 
-  /** Camera ray with a little aim assist for creatures and a sweep for near misses. */
+  /**
+   * Ray from the player's actual eye/look — not the render camera, which in third person sits
+   * pulled back over the shoulder and would otherwise aim (and reach) from the wrong place —
+   * with a little aim assist for creatures and a sweep for near misses.
+   */
   private meleeTrace(reach: number): RayHit | null {
     const ctx = this.ctx;
     const cam = ctx.camera;
-    cam.getWorldPosition(_o);
-    cam.getWorldDirection(_d);
+    _o.copy(ctx.player.eyePosition);
+    ctx.player.lookDir(_d);
     const ray = ctx.physics.raycast(_o, _d, reach, { mask: Layer.HITTABLE });
     // Creatures: forgiving cone.
     let best: RayHit | null = null;
     _v.copy(_o).addScaledVector(_d, reach * 0.55);
-    const ents = ctx.physics.overlapSphere(_v, reach * 0.6 + 0.3, Layer.ENTITY);
+    // Wide net + generous perpendicular tolerance: a swing has a real windup (~0.2s), and small
+    // fast animals (hares especially) can hop just far enough in that time to slip a tight cone.
+    const ents = ctx.physics.overlapSphere(_v, reach * 0.7 + 0.6, Layer.ENTITY);
     for (const c of ents) {
       if (!(c.owner instanceof Animal) || !c.owner.alive) continue;
       _w.copy(c.position).sub(_o);
       const t = _w.dot(_d);
-      if (t < 0.2 || t > reach + c.radius) continue;
+      if (t < 0.2 || t > reach + c.radius + 0.5) continue;
       const perp = Math.sqrt(Math.max(0, _w.lengthSq() - t * t));
-      if (perp > c.radius + 0.4) continue;
+      if (perp > c.radius + 0.85) continue;
       const dist = Math.max(0.2, t - c.radius * 0.6);
       if (best && dist >= best.distance) continue;
       const point = _o.clone().addScaledVector(_d, dist);
@@ -632,12 +638,19 @@ export class Weapons implements System {
     cam.updateMatrixWorld(true);
     obj.updateWorldMatrix(true, false);
     out.copy(local).applyMatrix4(obj.matrixWorld);
-    cam.getWorldPosition(_o);
-    cam.getWorldDirection(_d);
+    const player = ctx.sys.player as unknown as { thirdPerson?: boolean };
+    if (player.thirdPerson) {
+      // The viewmodel rides the camera, which in third person sits well behind the body and
+      // has no visible weapon there anyway — launch from the character instead.
+      out.copy(ctx.player.eyePosition);
+    }
+    // Aim from the player's actual eye/look, not the (possibly pulled-back) render camera.
+    _o.copy(ctx.player.eyePosition);
+    ctx.player.lookDir(_d);
     const h = ctx.physics.raycast(_o, _d, 150, { mask: Layer.HITTABLE });
     const aimDist = h ? Math.max(4, h.distance) : 150;
     _w.copy(_o).addScaledVector(_d, aimDist);
-    // Start the projectile on the camera ray if the hand point is inside something.
+    // Start the projectile on the aim ray if the hand point is inside something.
     dir.copy(_w).sub(out).normalize();
     dir.y += lift;
     dir.normalize();
@@ -653,8 +666,8 @@ export class Weapons implements System {
     const start = new THREE.Vector3();
     const dir = new THREE.Vector3();
     this.aimFrom(_v.set(-0.012, 0.004, -0.1), bowObj, start, dir, 0.004);
-    // Keep the launch point on the camera side of walls: if blocked, start at the eye.
-    ctx.camera.getWorldPosition(_o);
+    // Keep the launch point on the eye side of walls: if blocked, start at the eye.
+    _o.copy(ctx.player.eyePosition);
     if (ctx.physics.raycast(_o, _w.copy(start).sub(_o).normalize(), _o.distanceTo(start), { mask: Layer.HITTABLE | Layer.SOLID })) start.copy(_o);
     this.projectiles.fireArrow(start, dir, speed);
     ctx.audio.play('bow_release', { pitchVar: 0.06 });
@@ -678,7 +691,7 @@ export class Weapons implements System {
     const dir = new THREE.Vector3();
     // Tip of the spear in model space is the origin of the spear model.
     this.aimFrom(_v.set(0, 0, -0.9), this.spear, start, dir, 0.03);
-    ctx.camera.getWorldPosition(_o);
+    _o.copy(ctx.player.eyePosition);
     if (ctx.physics.raycast(_o, _w.copy(start).sub(_o).normalize(), _o.distanceTo(start), { mask: Layer.HITTABLE | Layer.SOLID })) start.copy(_o);
     const speed = 15 + 17 * this.charge;
     this.projectiles.throwSpear(start, dir, speed, slot);

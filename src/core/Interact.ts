@@ -53,8 +53,10 @@ export class Interactions {
       this.holdProgress = 0;
       return;
     }
-    const eye = ctx.camera.position;
-    ctx.camera.getWorldDirection(_dir);
+    // Reach from the player's actual eye/look, not the render camera — in third person the
+    // camera sits pulled back over the shoulder and would otherwise miss everything in reach.
+    const eye = p.eyePosition;
+    p.lookDir(_dir);
     let best: Interactable | null = null;
     let bestScore = -Infinity;
     for (const it of this.items) {
