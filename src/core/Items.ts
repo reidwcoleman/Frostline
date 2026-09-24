@@ -14,7 +14,9 @@ export type ItemId =
   | 'spear'
   | 'bow'
   | 'arrow'
-  | 'torch';
+  | 'torch'
+  | 'crampons'
+  | 'ice_axe';
 
 export type ItemKind = 'resource' | 'food' | 'medical' | 'tool' | 'weapon' | 'ammo' | 'light';
 
@@ -48,6 +50,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   spear: { id: 'spear', name: 'Spear', kind: 'weapon', stack: 1, weight: 1.5, equip: true, description: 'Hold to aim, release to throw. Retrieve it after.' },
   bow: { id: 'bow', name: 'Hunting bow', kind: 'weapon', stack: 1, weight: 1, equip: true, description: 'Hold to draw. Needs arrows.' },
   arrow: { id: 'arrow', name: 'Arrow', kind: 'ammo', stack: 30, weight: 0.05, description: 'Stone-tipped. Recoverable.' },
+  crampons: { id: 'crampons', name: 'Crampons', kind: 'tool', stack: 1, weight: 0.9, description: 'Stone spikes lashed to your boots. Walk up steep snow and ice without slipping.' },
+  ice_axe: { id: 'ice_axe', name: 'Ice axe', kind: 'tool', stack: 1, weight: 0.8, description: 'Swing it into the slope and haul yourself up. Lets you climb the steepest faces (tiring).' },
   torch: { id: 'torch', name: 'Torch', kind: 'light', stack: 5, weight: 0.4, equip: true, description: 'Light and warmth. Wolves keep their distance.' },
 };
 

@@ -17,6 +17,8 @@ export const RECIPES: Recipe[] = [
   { id: 'bow', name: 'Hunting bow', out: 'bow', count: 1, cost: { stick: 4, hide: 1 }, seconds: 4 },
   { id: 'arrows', name: 'Arrows ×4', out: 'arrow', count: 4, cost: { stick: 2, stone: 1 }, seconds: 2 },
   { id: 'torch', name: 'Torch', out: 'torch', count: 1, cost: { stick: 1, cloth: 1 }, seconds: 1 },
+  { id: 'crampons', name: 'Crampons', out: 'crampons', count: 1, cost: { stone: 4, hide: 1, stick: 2 }, seconds: 4 },
+  { id: 'ice_axe', name: 'Ice axe', out: 'ice_axe', count: 1, cost: { stick: 2, stone: 3, cloth: 1 }, seconds: 3 },
   { id: 'bandage', name: 'Bandage', out: 'bandage', count: 1, cost: { cloth: 2 }, seconds: 1.5 },
   { id: 'cook', name: 'Cook meat', out: 'cooked_meat', count: 1, cost: { raw_meat: 1 }, needsFire: true, seconds: 3 },
 ];

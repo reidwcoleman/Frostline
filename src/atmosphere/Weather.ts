@@ -48,10 +48,10 @@ const PARAMS: Record<WeatherKind, KindParams> = {
 };
 
 const DURATION: Record<WeatherKind, [number, number]> = {
-  clear: [3, 7.5],
-  overcast: [1.5, 4],
-  snow: [1.5, 3.5],
-  blizzard: [1, 3],
+  clear: [1.5, 4],
+  overcast: [1, 2.5],
+  snow: [2, 5],
+  blizzard: [0.75, 2],
 };
 
 /** Small serialisable PRNG. */
@@ -121,10 +121,11 @@ export class Weather implements System {
     const dev = this.ctx.dev.weather;
     this.rng = new Rng(((this.ctx.game.seed ?? 42) * 7919 + 17) >>> 0);
     this.locked = !!dev && dev in PARAMS;
-    this.current = this.target = this.locked ? (dev as WeatherKind) : 'clear';
+    // Open on gently falling snow (the game's signature mood); it clears, clouds over and snows
+    // again on its own, with the first storms possible from day one.
+    this.current = this.target = this.locked ? (dev as WeatherKind) : 'snow';
     this.progress = 1;
-    // Day one stays clear through the first sunset and the aurora.
-    this.remaining = this.locked ? 1e9 : 13;
+    this.remaining = this.locked ? 1e9 : 2.5;
     this.clearCover = 0.12;
     this.cirrusTarget = 0.45;
     this.windAngle = this.rng.range(0, Math.PI * 2);
@@ -156,13 +157,14 @@ export class Weather implements System {
       case 'clear':
         return r < 0.2 ? 'clear' : 'overcast';
       case 'overcast': {
-        const pSnow = clamp(0.42 + 0.05 * day, 0.45, 0.72);
+        const pSnow = clamp(0.68 + 0.04 * day, 0.68, 0.85);
         return r < pSnow ? 'snow' : 'clear';
       }
       case 'snow': {
-        const pBliz = day <= 2 ? 0 : clamp(0.42 + 0.04 * (day - 3), 0.42, 0.7);
+        // Storms from day 1: occasional at first, more often as the winter deepens.
+        const pBliz = clamp(0.22 + 0.06 * (day - 1), 0.22, 0.55);
         if (r < pBliz) return 'blizzard';
-        return this.rng.next() < 0.25 ? 'snow' : 'overcast';
+        return this.rng.next() < 0.4 ? 'snow' : 'overcast';
       }
       case 'blizzard':
         return 'snow';

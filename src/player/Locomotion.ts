@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import type { PlayerState } from '../core/PlayerState';
 import type { SurfaceKind } from '../core/Terrain';
-import { angleDelta, clamp, damp, lerp, smoothstep } from '../core/math';
+import { angleDelta, clamp, damp, DEG, lerp, smoothstep } from '../core/math';
 import type { Controls } from './Controls';
 import { makeSample, type Ground, type GroundKind, type GroundSample } from './Ground';
 import { GRAVITY, SKI, WALK } from './tuning';
@@ -126,6 +126,11 @@ export class Locomotion {
   crashSpin = 1;
   private lastPos = new THREE.Vector3();
   private capsuleH = 1.8;
+
+  /** Climbing gear in the pack (set by PlayerController each frame from the inventory). */
+  gear = { crampons: false, iceAxe: false };
+  /** 0..1 how hard the player is climbing a steep face with the ice axe (for camera/audio). */
+  axeClimb = 0;
 
   constructor(public p: PlayerState, public ground: Ground) {}
 
@@ -458,7 +463,15 @@ export class Locomotion {
     let wx = this.wishX * this.wishSpeed,
       wz = this.wishZ * this.wishSpeed;
 
-    // Grade limits: slow down uphill, refuse > maxClimb (you can still traverse across it).
+    // Grade limits. Gear decides how steep you can go:
+    //  - boots: up to WALK.maxClimb
+    //  - crampons: steep snow and ice (~64 deg), no slipping on ice
+    //  - ice axe: haul yourself up almost anything (~86 deg) at a steady, stamina-hungry pace
+    const g = this.gear;
+    const axeOk = g.iceAxe && p.stamina > 1;
+    const maxClimb = axeOk ? 86 * DEG : g.crampons ? 64 * DEG : WALK.maxClimb;
+    const slideAngle = axeOk ? 88 * DEG : g.crampons ? 70 * DEG : WALK.slideAngle;
+    let climbingFace = false;
     if (natural && slope > 0.02) {
       const hl = Math.hypot(n.x, n.z);
       const ux = -n.x / hl,
@@ -468,10 +481,19 @@ export class Locomotion {
         const along = (wx * ux + wz * uz) / wl;
         if (along > 0) {
           const dirGrade = Math.atan(Math.tan(slope) * along);
-          const f = 1 - 0.5 * smoothstep(0, WALK.maxClimb, dirGrade);
+          // Gentle slowdown uphill (hills shouldn't feel like walls).
+          const f = 1 - 0.3 * smoothstep(0, maxClimb, dirGrade);
           wx *= f;
           wz *= f;
-          if (dirGrade > WALK.maxClimb) {
+          if (dirGrade > (g.crampons ? 64 * DEG : WALK.maxClimb) && axeOk) {
+            // Axe climbing: a slow, steady haul; burns stamina.
+            climbingFace = true;
+            const k = 1.25 / Math.max(1e-4, Math.hypot(wx, wz));
+            wx *= Math.min(1, k * (g.crampons ? 1.3 : 1));
+            wz *= Math.min(1, k * (g.crampons ? 1.3 : 1));
+            p.stamina = Math.max(0, p.stamina - 6 * h);
+          }
+          if (dirGrade > maxClimb) {
             const up = wx * ux + wz * uz;
             wx -= ux * up;
             wz -= uz * up;
@@ -479,9 +501,10 @@ export class Locomotion {
         }
       }
     }
+    this.axeClimb = damp(this.axeClimb, climbingFace ? 1 : 0, 6, h);
 
-    this.sliding = natural && slope > WALK.slideAngle;
-    const ice = p.surface === 'ice';
+    this.sliding = natural && slope > slideAngle;
+    const ice = p.surface === 'ice' && !g.crampons;
     if (this.sliding) {
       // Too steep to stand: slide down with snow friction, little control.
       _gt.set(0, -GRAVITY, 0).addScaledVector(n, GRAVITY * n.y);

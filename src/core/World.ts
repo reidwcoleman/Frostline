@@ -89,13 +89,23 @@ export class World {
         const ds = Math.hypot(x - sx, z - sz);
         if (ds < 14) continue;
         density *= smoothstep(14, 40, ds);
+        // Forest regions, so the valley isn't one uniform wood: dense spruce-fir, open pine
+        // parkland, and an old burn of standing dead snags with young firs regrowing.
+        const zone = n.fbm(x * 0.0009 + 50, z * 0.0009 - 30, 2);
+        const parkland = smoothstep(0.18, 0.4, zone);
+        const burn = smoothstep(-0.22, -0.42, zone);
+        density *= 1 - parkland * 0.45 - burn * 0.25;
         if (r2 > density) continue;
         const r3 = hash2(i, j, seed + 3);
         const r4 = hash2(i, j, seed + 4);
         let type: TreeType = r3 < 0.62 ? TreeType.Spruce : r3 < 0.9 ? TreeType.Pine : TreeType.Fir;
+        if (parkland > 0.5) type = r3 < 0.78 ? TreeType.Pine : r3 < 0.92 ? TreeType.Spruce : TreeType.Fir;
+        if (burn > 0.5) type = r3 < 0.5 ? TreeType.Snag : r3 < 0.85 ? TreeType.Fir : TreeType.Pine;
         const nearTreeline = smoothstep(treeline - 160, treeline, h);
         if (r4 < 0.03 + nearTreeline * 0.12) type = TreeType.Snag;
         let scale = 0.72 + hash2(i, j, seed + 5) * 0.62;
+        if (burn > 0.5 && type === TreeType.Fir) scale *= 0.7;
+        if (parkland > 0.5 && type === TreeType.Pine) scale *= 1.12;
         scale *= 1 - nearTreeline * 0.35;
         if (type === TreeType.Fir) scale *= 1.2;
         tx.push(x);

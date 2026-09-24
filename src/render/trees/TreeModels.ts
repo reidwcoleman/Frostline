@@ -251,32 +251,17 @@ function conifer(b: Builder, d: Detail, rng: Rng, H: number, widthRatio: number,
 }
 
 function pine(b: Builder, d: Detail, rng: Rng, H: number) {
-  // Scots pine: straight clear bole, orange upper bark, an irregular rounded crown of big puffs.
-  trunk(b, 0.32, 0.1, -0.4, H * 0.9, d.trunkSeg, BARK, H, 0, rng);
-  trunk(b, 0.21, 0.07, H * 0.5, H * 0.95, d.trunkSeg, PINE_BARK_UP, H, 0, rng);
-  const layers = 3;
-  const perLayer = [4, 3, 2];
-  for (let L = 0; L < layers; L++) {
-    const n = Math.max(1, Math.round(perLayer[L] * Math.max(0.7, d.tiers)));
-    const t = L / (layers - 1);
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * Math.PI * 2 + L * 0.9 + rng() * 0.8;
-      const off = (1 - t * 0.75) * (1.3 + rng() * 1.1);
-      const cx = Math.cos(a) * off,
-        cz = Math.sin(a) * off;
-      const y = H * (0.62 + 0.27 * t) + (rng() - 0.5) * 0.9;
-      const R = (2.2 + rng() * 0.8) * (1 - t * 0.35);
-      stick(b, 0, y - 0.9, 0, cx, 0.7, cz, off + 0.4, 0.1, PINE_BARK_UP, H);
-      tier(
-        b,
-        { y, R, droop: R * 0.3, lobes: 7 + Math.floor(rng() * 3), phase: rng() * 6.28, thick: R * 0.55, needle: PINE_NEEDLE, snow: 1, H, cx, cz, dome: R * 0.42, lobeDepth: 0.3 },
-        d,
-        rng,
-      );
-    }
+  // Subalpine / lodgepole pine: tall straight bole with warm upper bark, a narrow, ragged crown
+  // over the top ~60% (lower branches self-pruned), sparser and more open than the spruce.
+  conifer(b, d, rng, H, 0.13, 0.36, 15, PINE_NEEDLE, 0.85, 0.3);
+  trunk(b, 0.19, 0.07, H * 0.34, H * 0.95, d.trunkSeg, PINE_BARK_UP, H, 0, rng);
+  // A few dead lower stubs on the bare bole.
+  const stubs = Math.round(6 * Math.max(0.5, d.tiers));
+  for (let k = 0; k < stubs; k++) {
+    const a = rng() * Math.PI * 2;
+    const y = H * (0.12 + 0.22 * (k / stubs)) + (rng() - 0.5) * 0.4;
+    stick(b, Math.cos(a) * 0.2, y, Math.sin(a) * 0.2, Math.cos(a), -0.15 + rng() * 0.3, Math.sin(a), 0.4 + rng() * 0.5, 0.05, SNAG_BARK, H);
   }
-  // Crown top.
-  tier(b, { y: H * 0.96, R: 1.5, droop: 0.4, lobes: 7, phase: rng() * 6.28, thick: 0.8, needle: PINE_NEEDLE, snow: 1, H, dome: 0.6, lobeDepth: 0.3 }, d, rng);
 }
 
 function snag(b: Builder, d: Detail, rng: Rng, H: number) {
@@ -304,7 +289,7 @@ export function buildTreeGeometry(type: number, lod: number, variant = 0): THREE
   const H = TREE_HEIGHTS[type];
   switch (type) {
     case 0: // Norway spruce: narrow spire, heavy drooping tiers.
-      conifer(b, d, rng, H, 0.2, 0.09, 20, SPRUCE_NEEDLE, 1, 0.3);
+      conifer(b, d, rng, H, 0.19, 0.07, 26, SPRUCE_NEEDLE, 1, 0.3);
       break;
     case 1:
       pine(b, d, rng, H);

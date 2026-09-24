@@ -156,6 +156,30 @@ void terrainSurface() {
   snowAlb = mix(snowAlb, vec3(0.2, 0.3, 0.36), creekIce * 0.7);
   snowRough = mix(snowRough, 0.25, creekIce * 0.8);
 
+  // ---------------- regional variety: the valley shouldn't look the same everywhere.
+  // Large-scale region noise (nD, ~1.3 km) picks where each ground type shows up.
+  float alt = P.y;
+  float convex = max(-cav, 0.0);
+  float steepG = 1.0 - Nm.y;
+  // Wind-scoured hardpack and blue ice on high, exposed, convex ground (ridges, shoulders).
+  float scour = smoothstep(620.0, 900.0, alt + (nA.b - 0.5) * 160.0) * smoothstep(0.08, 0.5, convex + (nB.g - 0.5) * 0.4)
+              * (1.0 - forest) * (1.0 - lake);
+  snowAlb = mix(snowAlb, vec3(0.66, 0.75, 0.84), scour * 0.55);
+  snowRough = mix(snowRough, 0.38, scour * 0.7);
+  // Thin, wind-stripped snow in some low regions: dry grass and heath poke through in patches.
+  float heathRegion = smoothstep(0.52, 0.7, nD.b) * (1.0 - smoothstep(260.0, 420.0, alt)) * (1.0 - lake) * (1.0 - creek);
+  float heath = heathRegion * smoothstep(0.55, 0.78, nC.r * 0.6 + nB.a * 0.55) * (1.0 - forest * 0.6) * (1.0 - smoothstep(0.1, 0.35, steepG));
+  snowAlb = mix(snowAlb, mix(vec3(0.31, 0.27, 0.19), vec3(0.42, 0.38, 0.27), nC.g), heath * 0.85);
+  snowRough = mix(snowRough, 0.95, heath);
+  // Scree aprons: broken grey stone on the moderately steep ground below rock faces.
+  float scree = smoothstep(0.14, 0.24, steepG) * (1.0 - smoothstep(0.26, 0.34, steepG)) * smoothstep(420.0, 620.0, alt)
+              * smoothstep(0.4, 0.62, nD.r) * smoothstep(0.5, 0.72, nC.b + nB.b * 0.3) * (1.0 - forest);
+  snowAlb = mix(snowAlb, vec3(0.3, 0.29, 0.3) * (0.8 + 0.4 * nC.a), scree * 0.8);
+  snowRough = mix(snowRough, 0.9, scree);
+  // Sun crust vs cold powder: a faint warm/cool tint that varies by region and aspect.
+  float southFace = clamp(-Nm.z * 2.0, 0.0, 1.0);
+  snowAlb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.965), southFace * smoothstep(0.4, 0.7, nD.a) * 0.8);
+
   vec2 ss = slope + mg;
 
   // ---------------- snow trails (ski tracks, footprints) — crisp normal detail + compaction
@@ -184,7 +208,9 @@ void terrainSurface() {
   float ribs = clamp(-cav, -1.0, 1.0);
   float gully = smoothstep(0.5, 0.8, flow);
   float rockNoise = (nB.b - 0.5) * 0.12 + (nA.g - 0.5) * 0.12;
-  float rockMask = smoothstep(0.16, 0.25, steep + rockNoise + ribs * 0.2 - gully * 0.1) * (1.0 - lake);
+  // Snow holds on most slopes (as in real winter alps); rock shows on the steepest faces and
+  // wind-stripped ribs, with gullies filled in.
+  float rockMask = smoothstep(0.23, 0.35, steep + rockNoise + ribs * 0.22 - gully * 0.12) * (1.0 - lake);
   vec3 rockAlb = vec3(0.07);
   vec3 Nr = Nm;
   float rockSnow = 0.0;

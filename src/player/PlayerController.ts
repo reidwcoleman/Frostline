@@ -165,6 +165,9 @@ export class PlayerController implements System {
     }
 
     this.prevPos.copy(p.position);
+    const inv = this.ctx.inventory;
+    this.loco.gear.crampons = inv.has('crampons');
+    this.loco.gear.iceAxe = inv.has('ice_axe');
     this.loco.update(dt, c);
     this.effects(dt);
     this.stats(dt);

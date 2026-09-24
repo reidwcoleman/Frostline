@@ -387,7 +387,7 @@ html {
 
 .titlecard { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; white-space: nowrap; }
 /* A soft pool of shade behind the card so serif + subtitle read on sunlit snow. */
-.titlecard::before { content: ''; position: absolute; left: 50%; top: 50%; width: 46rem; height: 20rem; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(8, 12, 16, 0.42), rgba(8, 12, 16, 0.18) 55%, transparent); opacity: 0; transition: opacity 1.4s var(--ease-out); z-index: -1; }
+.titlecard::before { content: ''; position: absolute; left: 50%; top: 50%; width: 46rem; height: 20rem; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(8, 12, 16, 0.16), rgba(8, 12, 16, 0.06) 55%, transparent); opacity: 0; transition: opacity 1.4s var(--ease-out); z-index: -1; }
 .titlecard.show::before { opacity: 1; }
 .titlecard.hide::before { opacity: 0; }
 .titlecard .t { font-family: var(--serif); font-size: clamp(4.5rem, 11vmin, 8rem); line-height: 1; color: var(--ink-full); text-shadow: 0 2px 30px rgba(6, 9, 12, 0.45); opacity: 0; transform: translateY(10px); filter: blur(8px); transition: opacity 1.6s var(--ease-out), transform 1.8s var(--ease), filter 1.6s var(--ease-out); }
