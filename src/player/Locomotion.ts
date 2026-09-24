@@ -377,7 +377,12 @@ export class Locomotion {
 
     // Along-ski gravity is held by the edges while climbing (herringbone) or clipping in/out.
     if (climbing || toggling) v.addScaledVector(_gt, h).addScaledVector(_s, -_gt.dot(_s) * h);
-    else v.addScaledVector(_gt, h);
+    else {
+      v.addScaledVector(_gt, h);
+      // Game feel: extra downhill pull along the skis so runs build speed fast and feel thrilling.
+      const down = _gt.dot(_s);
+      if (down > 0) v.addScaledVector(_s, down * (SKI.slopeBoost - 1) * h);
+    }
 
     // Air drag
     const sp = v.length();

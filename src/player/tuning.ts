@@ -34,7 +34,9 @@ export const WALK = {
 
 export const SKI = {
   /** Along-ski kinetic friction coefficients by surface. */
-  mu: { snow: 0.026, ice: 0.01, rock: 0.3, wood: 0.1 } as Record<string, number>,
+  mu: { snow: 0.02, ice: 0.008, rock: 0.3, wood: 0.1 } as Record<string, number>,
+  /** Downhill pull multiplier along the skis (game feel: >1 builds speed faster than real life). */
+  slopeBoost: 1.8,
   /** Static friction when stopped (a waxed ski starts to glide at ~4°). */
   muStatic: 0.055,
   /** Lateral edge grip, in g, when fully edged. Above it the skis skid. */
@@ -45,10 +47,10 @@ export const SKI = {
   skidAlongBrake: 0.6,
   /** Grip lost to chatter at very high speed (fraction at `chatterSpeed[1]`). */
   chatter: 0.3,
-  chatterSpeed: [34, 58] as const,
+  chatterSpeed: [42, 70] as const,
   /** Quadratic air drag k (per meter): a = -k |v| v. 0.5·ρ·CdA/m with CdA≈0.6 m², m≈80 kg. */
-  drag: 0.0024,
-  tuckDrag: 0.44, // tuck removes over half the drag
+  drag: 0.0019,
+  tuckDrag: 0.36, // tuck removes ~two thirds of the drag
   crouchDrag: 0.85,
   tuckGrip: 0.78, // weight back in a tuck: less edge
   /** Edge boost from A/D when it agrees with the turn. */
@@ -67,8 +69,8 @@ export const SKI = {
   plowMax: 5.2,
   plowHoldSlope: 20 * DEG,
   /** Pole push / skating on the flat. */
-  poleAccel: 4.2, // peak push accel
-  poleMaxSpeed: 9, // pushes fade out approaching this speed
+  poleAccel: 5, // peak push accel
+  poleMaxSpeed: 11, // pushes fade out approaching this speed
   poleCycle: 0.95, // seconds per push stride
   skateDrain: 7,
   /** Herringbone / side-step climbing. */

@@ -144,7 +144,9 @@ export class World {
         if (Math.hypot(x - sx, z - sz) < 10) continue;
         const slope = this.gridSlope(x, z);
         const h = t.baseHeight(x, z);
-        const p = 0.05 + smoothstep(0.3, 0.9, slope) * 0.35 + smoothstep(TREELINE - 100, TREELINE + 200, h) * 0.15;
+        // Boulder fields: some regions are strewn with rock (old moraines / rockfall).
+        const boulderZone = smoothstep(0.25, 0.5, n.fbm(x * 0.0011 - 90, z * 0.0011 + 40, 2));
+        const p = (0.05 + smoothstep(0.3, 0.9, slope) * 0.35 + smoothstep(TREELINE - 100, TREELINE + 200, h) * 0.15) * (1 + boulderZone * 3.2);
         if (hash2(i, j, seed + 13) > p) continue;
         const big = hash2(i, j, seed + 14);
         const radius = big > 0.93 ? 2.2 + big * 2.2 : 0.45 + big * 1.3;

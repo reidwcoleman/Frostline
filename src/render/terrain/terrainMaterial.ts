@@ -172,10 +172,23 @@ void terrainSurface() {
   snowAlb = mix(snowAlb, mix(vec3(0.31, 0.27, 0.19), vec3(0.42, 0.38, 0.27), nC.g), heath * 0.85);
   snowRough = mix(snowRough, 0.95, heath);
   // Scree aprons: broken grey stone on the moderately steep ground below rock faces.
-  float scree = smoothstep(0.14, 0.24, steepG) * (1.0 - smoothstep(0.26, 0.34, steepG)) * smoothstep(420.0, 620.0, alt)
-              * smoothstep(0.4, 0.62, nD.r) * smoothstep(0.5, 0.72, nC.b + nB.b * 0.3) * (1.0 - forest);
-  snowAlb = mix(snowAlb, vec3(0.3, 0.29, 0.3) * (0.8 + 0.4 * nC.a), scree * 0.8);
+  float scree = smoothstep(0.18, 0.26, steepG) * (1.0 - smoothstep(0.3, 0.38, steepG)) * smoothstep(480.0, 680.0, alt)
+              * smoothstep(0.58, 0.74, nD.r) * smoothstep(0.66, 0.86, nC.b + nB.b * 0.3) * smoothstep(0.1, 0.4, convex) * (1.0 - forest);
+  snowAlb = mix(snowAlb, vec3(0.3, 0.29, 0.3) * (0.8 + 0.4 * nC.a), scree * 0.55);
   snowRough = mix(snowRough, 0.9, scree);
+  // Glaciers: on some high, gentle plateaus the snow gives way to old blue ice cut by crevasses.
+  float glacier = smoothstep(820.0, 960.0, alt + (nA.g - 0.5) * 120.0) * (1.0 - smoothstep(0.1, 0.24, steepG))
+                * smoothstep(0.42, 0.6, nD.g) * (1.0 - forest) * (1.0 - lake);
+  if (glacier > 0.001) {
+    float crevNear = 1.0 - smoothstep(60.0, 260.0, dist);
+    vec2 cdir = normalize(vec2(0.8, 0.6) + (vec2(nA.r, nA.b) - 0.5) * 0.9);
+    float cf = fract(dot(P.xz, cdir) / 11.0 + nB.r * 1.6);
+    float crevasse = smoothstep(0.9, 0.96, cf) * (1.0 - smoothstep(0.985, 1.0, cf)) * smoothstep(0.35, 0.6, nB.a) * crevNear;
+    vec3 ice = mix(vec3(0.66, 0.8, 0.9), vec3(0.8, 0.88, 0.94), nC.r);
+    snowAlb = mix(snowAlb, ice, glacier * 0.8);
+    snowAlb = mix(snowAlb, vec3(0.08, 0.2, 0.3), glacier * crevasse * 0.85);
+    snowRough = mix(snowRough, 0.2, glacier * 0.75);
+  }
   // Sun crust vs cold powder: a faint warm/cool tint that varies by region and aspect.
   float southFace = clamp(-Nm.z * 2.0, 0.0, 1.0);
   snowAlb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.965), southFace * smoothstep(0.4, 0.7, nD.a) * 0.8);
@@ -210,7 +223,7 @@ void terrainSurface() {
   float rockNoise = (nB.b - 0.5) * 0.12 + (nA.g - 0.5) * 0.12;
   // Snow holds on most slopes (as in real winter alps); rock shows on the steepest faces and
   // wind-stripped ribs, with gullies filled in.
-  float rockMask = smoothstep(0.23, 0.35, steep + rockNoise + ribs * 0.22 - gully * 0.12) * (1.0 - lake);
+  float rockMask = smoothstep(0.4, 0.54, steep + rockNoise * 1.3 + ribs * 0.28 - gully * 0.14) * (1.0 - lake);
   vec3 rockAlb = vec3(0.07);
   vec3 Nr = Nm;
   float rockSnow = 0.0;
@@ -229,24 +242,28 @@ void terrainSurface() {
     vec2 gz = (rz.xy - 0.5) * 4.0 * (8.0 / amp) + (bz.xy - 0.5) * 4.0 * 0.21 * 3.0;
     vec2 gy = (ry.xy - 0.5) * 4.0;
     vec3 grad = w.x * vec3(0.0, gx.y, gx.x) + w.z * vec3(gz.x, gz.y, 0.0) + w.y * vec3(gy.x, 0.0, gy.y);
-    // Vary the stratum period with slow noise so bands don't read as a perfectly uniform,
-    // mechanical staircase wall — real cliff faces break, offset and thicken irregularly.
-    float period = 5.0 + (nA.r - 0.5) * 3.5 + (nB.g - 0.5) * 2.0;
-    float strataY = (P.y + dot(P.xz, vec2(0.11, 0.06)) + (nB.r - 0.5) * 8.0) / period;
+    // Rock layering, tilted and warped by large-scale noise so it never traces height contours
+    // (iso-height bands are what made faces look like a topo map). Band colour + ledges fade out
+    // with distance so faces read as solid, naturally varied rock mass.
+    float period = 6.0 + (nA.r - 0.5) * 4.0 + (nB.g - 0.5) * 2.0;
+    float strataY = (P.y * 0.75 + dot(P.xz, vec2(0.34, 0.21)) + (nA.r - 0.5) * 38.0 + (nB.r - 0.5) * 9.0) / period;
     float band = fract(strataY);
     float bandId = floor(strataY);
-    // Ledges fade out well before mid-range so distant faces read as solid rock mass, not a barcode.
-    float ledge = smoothstep(0.84, 0.93, band) * (1.0 - smoothstep(0.96, 1.0, band)) * (1.0 - smoothstep(90.0, 240.0, dist));
-    // Step profile: each stratum overhangs slightly -> up-facing lip at its top (softened).
-    grad.y += (smoothstep(0.8, 0.95, band) - 0.25) * 0.5;
+    float nearF = 1.0 - smoothstep(35.0, 130.0, dist);
+    float ledge = smoothstep(0.84, 0.93, band) * (1.0 - smoothstep(0.96, 1.0, band)) * nearF;
+    grad.y += (smoothstep(0.8, 0.95, band) - 0.25) * 0.35 * nearF;
     float detailFade = 1.0 - smoothstep(60.0, 260.0, dist);
     Nr = normalize(Nm - (grad - dot(grad, Nm) * Nm) * mix(0.35, 0.9, detailFade));
     float h = w.x * (rx.z * 0.6 + bx.z * 0.4) + w.z * (rz.z * 0.6 + bz.z * 0.4) + w.y * ry.z;
     float av = w.x * (rx.w * 0.6 + bx.w * 0.4) + w.z * (rz.w * 0.6 + bz.w * 0.4) + w.y * ry.w;
-    float hb = hash12(vec2(bandId, 7.3));
-    vec3 cool = vec3(0.062, 0.063, 0.078);
-    vec3 warm = vec3(0.098, 0.08, 0.064);
-    rockAlb = mix(cool, warm, clamp(hb * 0.7 + (nA.b - 0.5) * 0.6, 0.0, 1.0)) * (0.6 + 0.8 * av) * (0.85 + 0.3 * hash12(vec2(bandId, 1.1)));
+    float hb = mix(0.5, hash12(vec2(bandId, 7.3)), nearF * 0.6);
+    // Regional lithology: dark schist in some massifs, pale granite in others, warm tan between.
+    float litho = nD.r;
+    vec3 schist = vec3(0.1, 0.1, 0.11);
+    vec3 granite = vec3(0.22, 0.22, 0.225);
+    vec3 tanRock = vec3(0.19, 0.175, 0.16);
+    vec3 baseRock = mix(mix(schist, tanRock, smoothstep(0.35, 0.55, litho)), granite, smoothstep(0.58, 0.75, litho));
+    rockAlb = baseRock * (0.75 + 0.5 * av) * (0.88 + 0.24 * hb) * (0.9 + 0.2 * nB.b);
     // Lichen / mineral stains, faded out at distance.
     float lichen = smoothstep(0.62, 0.8, nC.b) * (1.0 - smoothstep(40.0, 120.0, dist));
     rockAlb = mix(rockAlb, vec3(0.16, 0.15, 0.1), lichen * 0.3);
