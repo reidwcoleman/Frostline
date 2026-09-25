@@ -85,6 +85,7 @@ export class Body {
   private wArmL!: THREE.Group;
   private wArmR!: THREE.Group;
   private armSwing = 0;
+  private lean = 0;
 
   // camera space
   private torso = new THREE.Group();
@@ -251,6 +252,7 @@ export class Body {
     const want = env.snowfall > 0.05 ? 0.35 + 0.55 * env.snowfall : 0;
     snowCover.value = clamp(snowCover.value + (want - snowCover.value) * dt * (want > snowCover.value ? 1 / 60 : 1 / 240), 0, 1);
     this.updateFpProp();
+    this.breathe(dt);
     const alive = p.mode !== 'crashed' && p.mode !== 'dead';
 
     // ---- skis clip on/off animation
@@ -382,7 +384,12 @@ export class Body {
     // Hang the jacket from the neck (collar top ~13 cm under the eye), not up from the hips.
     torso.position.set(0, Math.min(eye - 0.47, hipH + 0.34), 0).addScaledVector(_x, leanShift * 0.6).addScaledVector(_f, -back * 0.3 + loco.tuck * 0.2);
     torso.rotation.set(0, this.skiYaw, 0);
-    torso.rotateX(-0.25 - loco.tuck * 0.9);
+    // Lean into speed on foot (sprinting drives the chest forward) and breathe.
+    const footLean = onSkis ? 0 : smoothstep(2.5, 6.5, p.speed) * 0.22;
+    this.lean = damp(this.lean, footLean, 5, dt);
+    torso.rotateX(-0.25 - loco.tuck * 0.9 - this.lean);
+    const br = Math.sin(this.idleT * (1.4 + this.exertion * 2.2)) * (0.012 + this.exertion * 0.012);
+    torso.scale.set(1 + br * 0.6, 1, 1 + br);
     head.position.set(0, eye - 0.05, 0).addScaledVector(_x, leanShift * 0.3);
 
     // Head turns with where you look (a little lag), tilts slightly with pitch.
@@ -452,6 +459,36 @@ export class Body {
       head.rotation.y += r.side * -0.55 * reachW * (r.kind === 'eat' || r.kind === 'heal' ? 0 : 1);
       torso.rotation.y += r.side * 0.22 * reachW;
     }
+  }
+
+  // ------------------------------------------------------------------ breath vapour
+  private breathT = 0;
+  private exertion = 0;
+  /** Exhale puffs from the mouth when it's cold: slow and faint at rest, quick and heavy when working. */
+  private breathe(dt: number) {
+    const { player: p, env, camera } = this.ctx;
+    const fx = (this.ctx.sys as unknown as { weapons?: { effects?: { breath?: (...a: number[]) => void } } }).weapons?.effects;
+    if (!fx?.breath || !p.alive || this.ctx.game.state !== 'playing') return;
+    const temp = env.temperatureAt(p.position.y);
+    if (temp > 6) return;
+    const work = clamp(p.speed / 6, 0, 1) * (p.onSkis ? 0.5 : 1) + (1 - p.stamina / 100) * 0.8;
+    this.exertion = damp(this.exertion, clamp(work, 0, 1), 0.8, dt);
+    const period = lerp(4.2, 1.5, this.exertion);
+    const prev = this.breathT;
+    this.breathT = (this.breathT + dt / period) % 1;
+    // exhale over the second half of each cycle
+    if (this.breathT < 0.55 || (prev > this.breathT && this.breathT < 0.55)) return;
+    if (Math.random() > dt * 9) return;
+    const k = clamp((6 - temp) / 18, 0.3, 1) * (0.7 + 0.5 * this.exertion);
+    // mouth: just in front of the face, below the eye
+    const f = _f.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
+    const base = this.tp ? this.headMesh.getWorldPosition(_a) : _a.copy(camera.position);
+    const pitchDrop = this.tp ? 0 : Math.sin(p.pitch) * 0.1;
+    const x = base.x + f.x * (this.tp ? 0.14 : 0.2),
+      y = base.y - (this.tp ? 0.05 : 0.12) + pitchDrop,
+      z = base.z + f.z * (this.tp ? 0.14 : 0.2);
+    const out = 0.35 + this.exertion * 0.4;
+    fx.breath(x, y, z, p.velocity.x * 0.8 + f.x * out + env.wind.x * 0.15, 0.05 - Math.random() * 0.1, p.velocity.z * 0.8 + f.z * out + env.wind.z * 0.15, k);
   }
 
   // ------------------------------------------------------------------ held items & the pack

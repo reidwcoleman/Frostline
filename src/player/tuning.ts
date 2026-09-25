@@ -5,12 +5,12 @@ import { DEG } from '../core/math';
 export const GRAVITY = 9.81;
 
 export const WALK = {
-  speed: 1.8,
-  sprintSpeed: 4.6,
-  crouchSpeed: 1.0,
+  speed: 2.4,
+  sprintSpeed: 6.4,
+  crouchSpeed: 1.3,
   /** Speed multiplier in untracked powder (packed = ice, rock, structures, boulders). */
   deepSnow: 0.85,
-  accel: 9, // m/s² toward the wanted velocity on snow
+  accel: 12, // m/s² toward the wanted velocity on snow
   decel: 11,
   iceAccel: 1.4, // ice: low traction, momentum carries
   iceDecel: 0.8,
@@ -21,12 +21,12 @@ export const WALK = {
   /** Beyond this the snow won't hold you: you slide. */
   slideAngle: 50 * DEG,
   slideFriction: 0.28,
-  sprintDrain: 12, // stamina / s
+  sprintDrain: 8, // stamina / s
   sprintResume: 15, // stamina needed to start sprinting again after running dry
   stepUp: 0.45, // max ledge you walk onto (foundations, rocks)
   snapDown: 0.45,
   /** Stride length = base + perSpeed * speed (meters per footstep). */
-  strideBase: 0.55,
+  strideBase: 0.62,
   strideSpeed: 0.2,
   fallDamageSpeed: 10, // impact speed (m/s into the ground) where fall damage starts (~5 m drop)
   fallDamagePer: 7,
@@ -36,7 +36,7 @@ export const SKI = {
   /** Along-ski kinetic friction coefficients by surface. */
   mu: { snow: 0.02, ice: 0.008, rock: 0.3, wood: 0.1 } as Record<string, number>,
   /** Downhill pull multiplier along the skis (game feel: >1 builds speed faster than real life). */
-  slopeBoost: 1.8,
+  slopeBoost: 2.3,
   /** Static friction when stopped (a waxed ski starts to glide at ~4°). */
   muStatic: 0.055,
   /** Lateral edge grip, in g, when fully edged. Above it the skis skid. */
@@ -47,9 +47,9 @@ export const SKI = {
   skidAlongBrake: 0.6,
   /** Grip lost to chatter at very high speed (fraction at `chatterSpeed[1]`). */
   chatter: 0.3,
-  chatterSpeed: [42, 70] as const,
+  chatterSpeed: [55, 90] as const,
   /** Quadratic air drag k (per meter): a = -k |v| v. 0.5·ρ·CdA/m with CdA≈0.6 m², m≈80 kg. */
-  drag: 0.0019,
+  drag: 0.0015,
   tuckDrag: 0.36, // tuck removes ~two thirds of the drag
   crouchDrag: 0.85,
   tuckGrip: 0.78, // weight back in a tuck: less edge
@@ -69,12 +69,12 @@ export const SKI = {
   plowMax: 5.2,
   plowHoldSlope: 20 * DEG,
   /** Pole push / skating on the flat. */
-  poleAccel: 5, // peak push accel
-  poleMaxSpeed: 11, // pushes fade out approaching this speed
-  poleCycle: 0.95, // seconds per push stride
-  skateDrain: 7,
+  poleAccel: 7.5, // peak push accel
+  poleMaxSpeed: 16, // pushes fade out approaching this speed
+  poleCycle: 0.8, // seconds per push stride
+  skateDrain: 5,
   /** Herringbone / side-step climbing. */
-  climbSpeed: 2.6,
+  climbSpeed: 3.4,
   climbMax: 44 * DEG,
   climbStartGrade: 7 * DEG,
   climbDrain: 5,

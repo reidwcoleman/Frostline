@@ -48,6 +48,42 @@ const CACHES: CacheDef[] = [
   { id: 'ranger', name: "ranger's lockbox", loot: { arrow: 10, hide: 1, bandage: 1 }, style: 'crate' },
 ];
 
+// Scattered stashes across the whole valley: something worth skiing to wherever you look.
+const STASH_NAMES = ['abandoned sled', "prospector's crate", 'snowed-in tent', "old survey cache", "poacher's stash", 'lost expedition pack', 'supply drop'];
+const STASH_LOOT: [ItemId, number, number, number][] = [
+  // item, min, max, weight
+  ['cooked_meat', 1, 3, 3],
+  ['raw_meat', 2, 4, 2],
+  ['bandage', 1, 3, 3],
+  ['arrow', 4, 12, 3],
+  ['cloth', 2, 5, 3],
+  ['torch', 1, 2, 2],
+  ['hide', 1, 3, 2],
+  ['stone', 3, 6, 1],
+  ['bow', 1, 1, 0.5],
+  ['spear', 1, 1, 0.6],
+  ['hatchet', 1, 1, 0.4],
+  ['crampons', 1, 1, 0.35],
+  ['ice_axe', 1, 1, 0.3],
+];
+const STASH_COUNT = 34;
+function makeStash(i: number, rng: () => number): CacheDef {
+  const loot: Partial<Record<ItemId, number>> = {};
+  const total = STASH_LOOT.reduce((a, l) => a + l[3], 0);
+  const n = 2 + Math.floor(rng() * 3);
+  for (let k = 0; k < n; k++) {
+    let r = rng() * total;
+    for (const [id, lo, hi, w] of STASH_LOOT) {
+      if ((r -= w) > 0) continue;
+      loot[id] = (loot[id] ?? 0) + lo + Math.floor(rng() * (hi - lo + 1));
+      if (ITEMS[id].stack === 1) loot[id] = 1;
+      break;
+    }
+  }
+  const styles: CacheDef['style'][] = ['crate', 'crate', 'pack', 'woodpile'];
+  return { id: 'stash' + i, name: STASH_NAMES[Math.floor(rng() * STASH_NAMES.length)], loot, style: styles[Math.floor(rng() * styles.length)] };
+}
+
 interface Cache {
   def: CacheDef;
   pos: THREE.Vector3;
@@ -385,6 +421,32 @@ export class Pickups {
       const pos = new THREE.Vector3(x, t.heightAt(x, z), z);
       this.addCache(def, pos, rng() * Math.PI * 2);
     });
+    this.placeStashes();
+  }
+
+  private placeStashes() {
+    const t = this.ctx.terrain;
+    const [sx, sz] = t.data.spawn;
+    const rng = mulberry32(this.ctx.game.seed * 7919 + 101);
+    const placed: [number, number][] = this.caches.map((c) => [c.pos.x, c.pos.z]);
+    for (let i = 0; i < STASH_COUNT; i++) {
+      const def = makeStash(i, rng);
+      for (let tries = 0; tries < 200; tries++) {
+        const a = rng() * Math.PI * 2;
+        const d = 180 + Math.sqrt(rng()) * 1700;
+        const x = sx + Math.cos(a) * d,
+          z = sz + Math.sin(a) * d;
+        if (!t.inBounds(x, z, 80) || t.lakeFactor(x, z) > 0.02 || t.slopeAngle(x, z) > 0.4) continue;
+        if (placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < 160)) continue;
+        let blocked = false;
+        this.ctx.world.forEachTree(x, z, 1.8, () => ((blocked = true), true));
+        this.ctx.world.forEachRock(x, z, 1, () => ((blocked = true), true));
+        if (blocked) continue;
+        placed.push([x, z]);
+        this.addCache(def, new THREE.Vector3(x, t.heightAt(x, z), z), rng() * Math.PI * 2);
+        break;
+      }
+    }
   }
 
   private addCache(def: CacheDef, pos: THREE.Vector3, yaw: number) {

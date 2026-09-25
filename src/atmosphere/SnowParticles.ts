@@ -5,7 +5,7 @@
 // wind-driven flakes.
 import * as THREE from 'three';
 import type { GameContext } from '../core/types';
-import { clamp, smoothstep } from '../core/math';
+import { clamp, damp, lerp, smoothstep } from '../core/math';
 
 const MAX = 16000;
 const BOX = 30; // metres, box edge around the camera
@@ -35,6 +35,9 @@ export class SnowParticles {
   private seed: Float32Array;
   private count = MAX;
   private placed = false;
+  private tw = { value: 0 };
+  private tTime = { value: 0 };
+  private dust = 0;
 
   constructor(private ctx: GameContext) {
     this.pos = new Float32Array(MAX * 3);
@@ -59,6 +62,26 @@ export class SnowParticles {
       opacity: 0.95,
       fog: true,
     });
+    // Twinkle (diamond dust): each crystal flashes as it tumbles through the sun.
+    this.mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTw = this.tw;
+      sh.uniforms.uTime = this.tTime;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTw;\nuniform float uTime;')
+        .replace(
+          '#include <fog_vertex>',
+          `#include <fog_vertex>
+          // A flake right against the lens would balloon into a blurry disc: cap the size
+          // (tiny for glittering dust crystals).
+          gl_PointSize = min( gl_PointSize, mix( 26.0, 4.0, uTw ) );
+          {
+            float h = fract( sin( float( gl_VertexID ) * 12.9898 ) * 43758.5453 );
+            float spark = pow( max( sin( uTime * ( 1.5 + h * 4.0 ) + h * 60.0 ), 0.0 ), 14.0 );
+            gl_PointSize *= mix( 1.0, 0.45 + 2.6 * spark, uTw );
+          }`,
+        );
+    };
+    this.mat.customProgramCacheKey = () => 'fl-snowpts-1';
     this.points = new THREE.Points(geo, this.mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 20;
@@ -77,7 +100,13 @@ export class SnowParticles {
   update(dt: number) {
     const { camera, env, sys } = this.ctx;
     const snow = env.snowfall;
-    this.points.visible = snow > 0.005;
+    // Diamond dust: clear, bright and bitterly cold -> ice crystals hang glittering in the air.
+    const clear = 1 - sys.weather.visual.cloudCover;
+    const temp = env.temperatureAt(camera.position.y);
+    const wantDust = clamp(1 - snow * 6, 0, 1) * smoothstep(0.45, 0.85, clear) * smoothstep(0.25, 0.6, env.daylight) * smoothstep(-3, -10, temp);
+    this.dust = damp(this.dust, wantDust, 0.3, dt);
+    this.tTime.value = this.ctx.time;
+    this.points.visible = snow > 0.005 || this.dust > 0.02;
     if (!this.points.visible) return;
     const cam = camera.position;
     const p = this.pos;
@@ -91,8 +120,10 @@ export class SnowParticles {
       this.placed = true;
     }
     const storm = sys.weather.visual.storm;
-    const active = Math.floor(this.count * clamp(Math.pow(snow, 0.7) * 0.92 + storm * 0.08, 0, 1));
-    const fall = 1.0 + 0.7 * snow + storm * 1.2;
+    const dm = this.dust * (1 - smoothstep(0.05, 0.25, snow)); // dust mode weight
+    this.tw.value = dm;
+    const active = Math.max(Math.floor(this.count * clamp(Math.pow(snow, 0.7) * 0.92 + storm * 0.08, 0, 1)), Math.floor(this.count * 0.15 * dm));
+    const fall = lerp(1.0 + 0.7 * snow + storm * 1.2, 0.12, dm);
     const wx = env.wind.x,
       wz = env.wind.z;
     const t = this.ctx.time;
@@ -123,7 +154,7 @@ export class SnowParticles {
     attr.needsUpdate = true;
 
     // Real flakes clump to 1-3 cm; at game scale they need to read clearly. Storms: bigger clumps.
-    this.mat.size = 0.06 + 0.035 * snow + 0.03 * storm;
+    this.mat.size = lerp(0.06 + 0.035 * snow + 0.03 * storm, 0.022, dm);
     // Bright ice: lit by sky + sun, but always clearly lighter than an overcast sky so snowfall reads.
     const sky = sys.sky;
     _col.copy(sky.ambient).multiplyScalar(2.2).add(
@@ -133,6 +164,7 @@ export class SnowParticles {
     const floor = 0.95 * Math.max(0.3, env.daylight);
     if (lum < floor) _col.multiplyScalar(floor / Math.max(lum, 1e-3));
     this.mat.color.copy(_col);
-    this.mat.opacity = 0.75 + 0.2 * smoothstep(0, 0.6, snow);
+    this.mat.opacity = lerp(0.75 + 0.2 * smoothstep(0, 0.6, snow), 1, dm);
+    if (dm > 0.01) this.mat.color.lerp(_col.setRGB(1.6, 1.55, 1.45), dm * 0.7);
   }
 }

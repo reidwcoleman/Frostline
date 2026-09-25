@@ -153,7 +153,23 @@ export class PlayerController implements System {
   }
 
   // ------------------------------------------------------------------ frame
+  private bestSpeed = 0;
+  private speedToastT = 0;
+  /** Top-speed callouts on skis (a new personal best above 50 km/h). */
+  private speedRecords(dt: number) {
+    const p = this.ctx.player;
+    this.speedToastT -= dt;
+    if (!p.onSkis || !p.grounded) return;
+    const kmh = p.speed * 3.6;
+    if (kmh > 50 && kmh > this.bestSpeed + 6 && this.speedToastT <= 0) {
+      this.bestSpeed = kmh;
+      this.speedToastT = 3;
+      this.ctx.ui.toast(`New top speed: ${Math.round(kmh)} km/h`, 'good');
+    }
+  }
+
   update(dt: number) {
+    this.speedRecords(dt);
     const { player: p, dev, camera } = this.ctx;
     const c = this.readControls(dt);
 
@@ -423,6 +439,13 @@ export class PlayerController implements System {
           if (severity) {
             const dmg = (impact - SKI.landHard) * SKI.landHardDamage;
             if (dmg > 0.5) p.damage(dmg, 'fall');
+          }
+          // Stomped a big one: the rush tops up stamina and warms you.
+          if (air > 0.75 && !severity) {
+            const tier = air > 2 ? 'Huge air' : air > 1.3 ? 'Big air' : 'Nice air';
+            p.stamina = Math.min(100, p.stamina + 12 + air * 10);
+            p.warmth = Math.min(100, p.warmth + air * 2);
+            this.ctx.ui.toast(`${tier}: ${air.toFixed(1)} s`, 'good');
           }
           if (!this.loco.packed) {
             const n = Math.round(12 + impact * 5 + air * 6);
