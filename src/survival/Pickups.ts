@@ -335,8 +335,24 @@ export class Pickups {
     if (best) this.proxyPos.set((best as Spot).x, (best as Spot).y + 0.04, (best as Spot).z);
   }
 
+  private spotted = new Set<string>();
+  private spotT = 0;
+
   update(dt: number) {
     const p = this.ctx.player.position;
+    // Discovery: call out an unsearched stash as you come within sight of it.
+    if ((this.spotT -= dt) <= 0) {
+      this.spotT = 0.5;
+      for (const c of this.caches) {
+        if (c.looted || this.spotted.has(c.def.id)) continue;
+        const d = Math.hypot(c.pos.x - p.x, c.pos.z - p.z);
+        if (d < 70) {
+          this.spotted.add(c.def.id);
+          this.ctx.ui.toast(`You spot something: ${c.def.name}, ${Math.round(d)} m away`, 'info');
+          break;
+        }
+      }
+    }
     if (this.dirty || Math.hypot(p.x - this.center.x, p.z - this.center.z) > 8) this.rebuild();
     // Falling drops.
     let moved = false;

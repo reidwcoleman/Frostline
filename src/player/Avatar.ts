@@ -214,7 +214,7 @@ export function buildAvatar(m: GearMaterials): Avatar {
   const steel = new THREE.MeshStandardMaterial({ color: 0xaab2bb, roughness: 0.28, metalness: 0.9 });
   const fur = new THREE.MeshPhysicalMaterial({ color: 0x6a6054, roughness: 1, sheen: 0.9, sheenRoughness: 0.9, sheenColor: new THREE.Color(0.75, 0.7, 0.62) });
   const skin = new THREE.MeshPhysicalMaterial({ color: 0xc28a6c, roughness: 0.55, sheen: 0.4, sheenRoughness: 0.6, sheenColor: new THREE.Color(0.9, 0.35, 0.3) });
-  const lens = new THREE.MeshPhysicalMaterial({ color: 0xe0782a, roughness: 0.05, metalness: 0.85, clearcoat: 1, clearcoatRoughness: 0.03, iridescence: 0.6, iridescenceIOR: 1.6 });
+  const lens = new THREE.MeshPhysicalMaterial({ color: 0xe0782a, roughness: 0.14, metalness: 0.85, clearcoat: 1, clearcoatRoughness: 0.12, iridescence: 0.6, iridescenceIOR: 1.6 });
   const frame = new THREE.MeshStandardMaterial({ color: 0x0f1012, roughness: 0.5 });
   const glove = snowy(new THREE.MeshPhysicalMaterial({ color: 0x3b2c22, roughness: 0.55, sheen: 0.3, sheenColor: new THREE.Color(0.5, 0.4, 0.3) }), 0.5);
   const zip = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.35, metalness: 0.4 });

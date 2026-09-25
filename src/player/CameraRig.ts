@@ -9,6 +9,12 @@ import { CAM, EYE, SKI } from './tuning';
 import type { Locomotion } from './Locomotion';
 
 const _tpDir = new THREE.Vector3();
+const _eye = new THREE.Vector3();
+const _tgt = new THREE.Vector3();
+const _sx = new THREE.Vector3();
+const _sy = new THREE.Vector3();
+const _o = new THREE.Vector3();
+const _upV = new THREE.Vector3(0, 1, 0);
 
 export class CameraRig {
   /** Current eye height above the feet (smoothed stance). */
@@ -37,6 +43,10 @@ export class CameraRig {
   private togglePitch = 0;
   private tpOn = false;
   private tpDist = 0;
+  private camLen = 0;
+  private indoor = 0;
+  /** Third person actually in effect (false while the camera has no room and sits at the eye). */
+  viewThird = false;
   // Leg absorption: the head rides a filtered copy of the feet height.
   private headY = 0;
   private headVy = 0;
@@ -245,28 +255,54 @@ export class CameraRig {
     const yaw = p.yaw + shY + deathYaw;
     camera.rotation.set(pitch, yaw, this.roll + this.kickR + shR + tumbleR + deathR + this.sway, 'YXZ');
 
-    // ---- third person: pull the camera back over the shoulder along the (roll-free) look
-    // direction, riding up and stopping short of the terrain/any obstruction so it never clips.
+    // ---- third person: pull the camera back behind the head along the (roll-free) look direction.
+    // A 5-ray "sphere" sweep from the eye to the wanted spot stops it short of walls, roofs, trees
+    // and rocks (so the near plane never slices into geometry and blacks the screen). Under a roof
+    // the camera tucks in close and stays low; if there's no room at all it drops to first person.
     this.tpDist = damp(this.tpDist, this.tpOn ? CAM.tpDistance : 0, 6, dt);
+    const phys = this.ctx.physics;
     if (this.tpDist > 0.01) {
+      const eye = _eye.copy(camera.position);
+      const roof = phys.raycast(eye, _upV, 4, { mask: Layer.SOLID, terrain: false, trees: false, rocks: false });
+      this.indoor = damp(this.indoor, roof ? 1 : 0, 5, dt);
+      const want = lerp(this.tpDist, Math.min(this.tpDist, 1.8), this.indoor);
+      let lift = CAM.tpHeight * smoothstep(0, CAM.tpDistance, want) * (1 - 0.85 * this.indoor);
+      if (roof) lift = Math.min(lift, Math.max(0, roof.distance - 0.45));
       const cp = Math.cos(pitch);
-      const fx = -Math.sin(yaw) * cp,
-        fy = Math.sin(pitch),
-        fz = -Math.cos(yaw) * cp;
-      const eyeX = camera.position.x,
-        eyeY2 = camera.position.y,
-        eyeZ = camera.position.z;
-      let dist = this.tpDist;
-      _tpDir.set(-fx, -fy, -fz);
-      const hit = this.ctx.physics.raycast(camera.position, _tpDir, dist + 0.4, { mask: Layer.SOLID });
-      if (hit) dist = Math.max(0.4, hit.distance - 0.35);
-      const upBoost = CAM.tpHeight * smoothstep(0, CAM.tpDistance, dist);
-      let cx = eyeX - fx * dist,
-        cy = eyeY2 - fy * dist + upBoost,
-        cz = eyeZ - fz * dist;
-      const gy = terrain.heightAt(cx, cz) + 0.3;
-      if (cy < gy) cy = gy;
+      _tgt.set(eye.x + Math.sin(yaw) * cp * want, eye.y - Math.sin(pitch) * want + lift, eye.z + Math.cos(yaw) * cp * want);
+      _tpDir.subVectors(_tgt, eye);
+      const len = _tpDir.length();
+      _tpDir.divideScalar(Math.max(len, 1e-4));
+      // perpendicular offsets for the sweep
+      _sx.crossVectors(_tpDir, _upV);
+      if (_sx.lengthSq() < 1e-4) _sx.set(1, 0, 0);
+      _sx.normalize();
+      _sy.crossVectors(_sx, _tpDir).normalize();
+      let free = len;
+      const R = 0.22;
+      for (let i = 0; i < 5; i++) {
+        _o.copy(eye);
+        if (i > 0) {
+          const a = ((i - 1) / 4) * TAU;
+          _o.addScaledVector(_sx, Math.cos(a) * R).addScaledVector(_sy, Math.sin(a) * R);
+        }
+        const hit = phys.raycast(_o, _tpDir, len + 0.3, { mask: Layer.SOLID });
+        if (hit) free = Math.min(free, hit.distance - 0.3);
+      }
+      free = Math.max(0, free);
+      // Snap in immediately when something gets in the way; ease back out.
+      this.camLen = free < this.camLen ? free : damp(this.camLen, free, 3, dt);
+      const L = this.camLen < 0.75 ? 0 : this.camLen;
+      let cx = eye.x + _tpDir.x * L,
+        cy = eye.y + _tpDir.y * L,
+        cz = eye.z + _tpDir.z * L;
+      const gy2 = terrain.heightAt(cx, cz) + 0.3;
+      if (cy < gy2) cy = gy2;
       camera.position.set(cx, cy, cz);
+      this.viewThird = L > 0;
+    } else {
+      this.camLen = 0;
+      this.viewThird = false;
     }
   }
 }

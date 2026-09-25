@@ -2,7 +2,24 @@
 // -> SMAA -> screen. Everything is HDR (half float) until the grade. Quality changes rebuild the passes
 // (a one-off in the settings menu); nothing recompiles during play.
 import * as THREE from 'three';
-import { BloomEffect, BlendFunction, EffectComposer, EffectPass, RenderPass, SMAAEffect, SMAAPreset } from 'postprocessing';
+import { BloomEffect, BlendFunction, Effect, EffectComposer, EffectPass, RenderPass, SMAAEffect, SMAAPreset } from 'postprocessing';
+
+/** One bad pixel (NaN / Inf from a razor-sharp sun glint in half float) would otherwise be blurred
+ *  across the whole screen by bloom and flash it black. Scrub those and cap extreme highlights. */
+class SanitizeEffect extends Effect {
+  constructor() {
+    super(
+      'Sanitize',
+      `void mainImage( const in vec4 inputColor, const in vec2 uv, out vec4 outputColor ) {
+        vec3 c = inputColor.rgb;
+        bvec3 bad = bvec3( c.r != c.r || c.r > 6.0e4, c.g != c.g || c.g > 6.0e4, c.b != c.b || c.b > 6.0e4 );
+        if ( any( bad ) ) c = vec3( 0.0 );
+        outputColor = vec4( clamp( c, 0.0, 48.0 ), inputColor.a );
+      }`,
+      { blendFunction: BlendFunction.SET },
+    );
+  }
+}
 import { N8AOPostPass } from 'n8ao';
 import type { GameContext, GameState, System } from '../core/types';
 import { clamp, damp, lerp, smoothstep } from '../core/math';
@@ -26,6 +43,7 @@ export class PostFX implements System {
   private frost = 0;
   private damage = 0;
   private speed = 0;
+  private adapt = 0;
   private builtQuality = '';
   private ready = false;
 
@@ -79,6 +97,8 @@ export class PostFX implements System {
       this.ao = ao;
     }
 
+    composer.addPass(new EffectPass(camera, new SanitizeEffect()));
+
     this.grade = new GradeEffect(this.frostRT!.texture);
     const effects: (BloomEffect | GradeEffect)[] = [];
     if (q.bloom) {
@@ -126,7 +146,10 @@ export class PostFX implements System {
     const sky = sys.sky;
     const wv = sys.weather.visual;
     const g = this.grade!;
-    const exposure = sky.exposure * 1.12;
+    // Eye adaptation: stepping into a cabin, the eye opens up over a couple of seconds.
+    const shelter = (this.ctx.sys.survival as unknown as { shelter?: { indoors?: boolean } })?.shelter;
+    this.adapt = damp(this.adapt, shelter?.indoors ? 1 : 0, shelter?.indoors ? 1.2 : 2.5, dt);
+    const exposure = sky.exposure * 1.12 * (1 + this.adapt * 1.8);
     g.u<number>('uExposure').value = exposure;
     if (this.bloom) {
       // keep the bloom threshold in display terms whatever the exposure

@@ -468,7 +468,8 @@ export class Body {
   private breathe(dt: number) {
     const { player: p, env, camera } = this.ctx;
     const fx = (this.ctx.sys as unknown as { weapons?: { effects?: { breath?: (...a: number[]) => void } } }).weapons?.effects;
-    if (!fx?.breath || !p.alive || this.ctx.game.state !== 'playing') return;
+    // Only seen from outside: at the eye a puff fills the lens as a white blob.
+    if (!fx?.breath || !p.alive || !this.tp || this.ctx.game.state !== 'playing') return;
     const temp = env.temperatureAt(p.position.y);
     if (temp > 6) return;
     const work = clamp(p.speed / 6, 0, 1) * (p.onSkis ? 0.5 : 1) + (1 - p.stamina / 100) * 0.8;
@@ -483,6 +484,7 @@ export class Body {
     // mouth: just in front of the face, below the eye
     const f = _f.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
     const base = this.tp ? this.headMesh.getWorldPosition(_a) : _a.copy(camera.position);
+    if (base.distanceTo(camera.position) < 1.5) return;
     const pitchDrop = this.tp ? 0 : Math.sin(p.pitch) * 0.1;
     const x = base.x + f.x * (this.tp ? 0.14 : 0.2),
       y = base.y - (this.tp ? 0.05 : 0.12) + pitchDrop,

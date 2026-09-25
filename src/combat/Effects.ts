@@ -557,7 +557,7 @@ export class Effects {
   /** A breath of vapour in the cold: pale, soft, quick to fade. */
   breath(x: number, y: number, z: number, vx: number, vy: number, vz: number, k = 1) {
     const L = 0.35 + 0.65 * this.light;
-    this.puffs.emit(x, y, z, vx, vy, vz, 0.02 + Math.random() * 0.012, 0.16 + Math.random() * 0.06, 0.8 + Math.random() * 0.4, 0.72 * L, 0.74 * L, 0.78 * L, 0.075 * k, 2.8, -0.03);
+    this.puffs.emit(x, y, z, vx, vy, vz, 0.015 + Math.random() * 0.01, 0.1 + Math.random() * 0.05, 0.7 + Math.random() * 0.35, 0.55 * L, 0.57 * L, 0.6 * L, 0.035 * k, 2.8, -0.03);
   }
 
   /** Grey smoke wisp. */

@@ -58,6 +58,11 @@ export class PlayerController implements System {
   private freelookReturn = false;
   /** Over-the-shoulder chase camera, toggled with the `toggleView` action (V). Default view. */
   thirdPerson = true;
+  /** Third person as currently rendered (drops to first person when the camera has no room). */
+  get viewThird() {
+    return this.rig.viewThird;
+  }
+  private bodyTp = true;
   private glideLoop: LoopHandle | null = null;
   private carveLoop: LoopHandle | null = null;
   private glideVol = 0;
@@ -126,6 +131,7 @@ export class PlayerController implements System {
     this.loco.reset();
     this.rig.setThirdPerson(this.thirdPerson);
     this.body.setThirdPerson(this.thirdPerson);
+    this.bodyTp = this.thirdPerson;
     this.rig.reset();
     this.body.reset();
     this.spray.clear();
@@ -182,6 +188,7 @@ export class PlayerController implements System {
       this.thirdPerson = !this.thirdPerson;
       this.rig.setThirdPerson(this.thirdPerson);
       this.body.setThirdPerson(this.thirdPerson);
+    this.bodyTp = this.thirdPerson;
     }
 
     this.prevPos.copy(p.position);
@@ -192,6 +199,10 @@ export class PlayerController implements System {
     this.effects(dt);
     this.stats(dt);
     this.rig.update(dt, this.loco);
+    if (this.rig.viewThird !== this.bodyTp) {
+      this.bodyTp = this.rig.viewThird;
+      this.body.setThirdPerson(this.bodyTp);
+    }
     this.body.update(dt, this.loco, this.rig.eye, false);
     this.spray.update(dt, this.ctx.env, camera, this.ctx.renderer);
   }

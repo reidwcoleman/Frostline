@@ -758,7 +758,7 @@ export class Weapons implements System {
     if (!visible) return;
     const t = ctx.time;
     // The flame lives on whichever torch you can see.
-    const tp = !!(ctx.sys.player as unknown as { thirdPerson?: boolean }).thirdPerson && this.tpTorch;
+    const tp = !!(ctx.sys.player as unknown as { viewThird?: boolean }).viewThird && this.tpTorch;
     const anchor = tp ? this.tpTorch!.flameAnchor : this.torch.flameAnchor;
     if (this.flame.group.parent !== anchor) anchor.add(this.flame.group);
     anchor.getWorldPosition(this.torchPosition);

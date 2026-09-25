@@ -382,7 +382,7 @@ function createMaterial(kind: MatKind): THREE.MeshStandardMaterial {
       .replace(
         '#include <lights_fragment_end>',
         /* glsl */ `{
-          float flOcc = mix(1.0, 0.16, flInt);
+          float flOcc = mix(1.0, 0.55, flInt);
           #if defined( RE_IndirectDiffuse )
             irradiance *= flOcc;
             iblIrradiance *= flOcc;

@@ -43,8 +43,8 @@ interface KindParams {
 const PARAMS: Record<WeatherKind, KindParams> = {
   clear: { cover: 0.18, thickness: 6, fog: 0, snow: 0, wind: 3.5, gust: 0.35, haze: 1.0, temp: 0 },
   overcast: { cover: 0.9, thickness: 14, fog: 0.00022, snow: 0.04, wind: 6, gust: 0.4, haze: 1.35, temp: -1 },
-  snow: { cover: 1.0, thickness: 22, fog: 0.0032, snow: 0.55, wind: 7.5, gust: 0.45, haze: 1.6, temp: -2 },
-  blizzard: { cover: 1.0, thickness: 34, fog: 0.062, snow: 1.0, wind: 19, gust: 0.6, haze: 2.2, temp: -10 },
+  snow: { cover: 1.0, thickness: 22, fog: 0.0013, snow: 0.55, wind: 7.5, gust: 0.45, haze: 1.6, temp: -2 },
+  blizzard: { cover: 1.0, thickness: 34, fog: 0.028, snow: 1.0, wind: 19, gust: 0.6, haze: 2.2, temp: -10 },
 };
 
 const DURATION: Record<WeatherKind, [number, number]> = {
